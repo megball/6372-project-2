@@ -1,0 +1,21 @@
+---
+title: "Project2"
+author: "MB"
+date: "11/4/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+#load libraries
+library(dplyr)
+library(tidyverse)
+```
+
+```{r Import data}
+full <- read_delim(here::here("data", "bank-additional-full.csv"),';')
+str(full)
+head(full)
+
+```
