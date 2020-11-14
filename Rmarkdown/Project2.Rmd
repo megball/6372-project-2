@@ -1,6 +1,6 @@
 ---
 title: "Project2"
-author: "MB"
+author: "Rinku Lichti, Simerpreet Reddy, Megan Ball"
 date: "11/4/2020"
 output: html_document
 ---
@@ -11,6 +11,13 @@ knitr::opts_chunk$set(echo = TRUE)
 #load libraries
 library(dplyr)
 library(tidyverse)
+library(ggplot2)
+library(caret)
+library(e1071)
+library(class)
+library(gridExtra)
+library(summarytools)
+
 ```
 
 ```{r Import data}
@@ -18,4 +25,189 @@ full <- read_delim(here::here("data", "bank-additional-full.csv"),';')
 str(full)
 head(full)
 
+nrow(full) 
+ncol(full)
 ```
+
+
+```{r}
+# Clean up column names
+full <- janitor::clean_names(full)
+
+summary(full)
+print(dfSummary(full, graph.magnif = 0.75), method = 'browser')
+str(full)
+
+
+```
+
+Looking at the dfsummary, there doesnt seem to be missing data in terms of just not having values. However, there are some fields that have explicit unknown or non-existent classes that could be considered as 'missing'. For example, loan and housing have 990 "unknown" values. And 'default' has 8597 "unknown" values representing 20.9% 
+
+pdays: number of days that passed by after the client was last contacted from a previous campaign (numeric; 999 means client was not previously contacted)
+
+```{r}
+#change some variables to factor
+cols <- c("job", "marital", "education", "default","housing","loan","contact","month","day_of_week","poutcome","y")
+
+full[cols] <- lapply(full[cols], factor) 
+
+str(full)
+
+```
+
+#Exploratory Data Analysis
+
+```{r}
+df_yes <- full %>%
+  filter(y=="yes")
+#summary(df_yes)
+
+# Nothing interesting found in the below code so commenting it out
+# ggplot(bank_additional_full, aes(x=age, y=emp.var.rate)) +
+#   geom_point(size=1, shape="circle") +
+#   ggtitle("Employment Variation Rate vs Age") + 
+#   facet_wrap(~ y)
+
+ggplot(full, aes(x=age, y=duration, color = y)) +
+  geom_point(size=1, shape="circle") + 
+  ggtitle("Duration vs Age")
+
+ggplot(full, aes(x=age, y=cons_price_idx, color = y)) +
+  geom_point(size=1, shape="circle") + 
+  ggtitle("Consumer Price Index vs Age") 
+
+# ggplot(bank_additional_full, aes(x=age, y=education)) +
+#   geom_point(size=1, shape="circle") + 
+#   ggtitle("Education vs Age")  + 
+#    facet_wrap(~ y)
+```
+
+Duration vs Age: The duration of last contact (in seconds) was longer for ages 25-50. And it was understandably longer for "yes" vs for "no"
+
+#Making new age group
+```{r}
+#Analysing Age
+ggplot(full) + geom_histogram(mapping = aes(x=age, fill=y)) +ggtitle("Distribution of 'y' by age")
+```
+
+```{r}
+#Creating new variables
+#Age_Grp - split the data into age groups "17-31","32-37" ,"38-47", "47-55", ">55" (based in IQR)
+full$Age_Grp <- cut(full$age, breaks = c(16,31,37,46,55,98), labels = c("17-31","32-37" ,"38-47", "47-55", ">55"))
+
+#validate the cut command
+#full %>% filter(!$Age_Grp  %in% c("17-31","32-37" ,"38-47", "47-55", ">55"))
+#full %>% filter(full$age==55)
+
+ggplot(full) + geom_bar(mapping = aes(x=Age_Grp, fill = y)) + ggtitle("Distribution of 'y' by Age_Grp") +
+  ylab("Cnt") + xlab("Age Group")
+
+
+```
+```{r}
+#Analyzing pdays
+ggplot(full) + geom_histogram(mapping = aes(x=pdays, fill=y))
+```
+
+- Analyzing 'pdays' ie., number of days that passed by after the client was last contacted from a previous campaign (numeric; 999 means client was not previously contacted)
+- Most folks had no previous campaign but if they did, it looks like most who had a previous campaign decided to subscribe
+
+
+```{r}
+#zoom in for ones that were previously contacted
+full %>%
+  filter(pdays < 999) %>%
+  ggplot() +
+  geom_histogram(mapping = aes(x=pdays, fill=y))
+
+```
+Highest frequency appears to be less than 10 days since last contact. Let's make this into a y/n variable instead due to the large gap between days contacted and the '999' variable.
+
+
+```{r}
+#prevly_Cntctd Yes/No. TO see the distribution or 'Y' on first time contact vs. a follow up
+full$prevly_Cntctd <- case_when(full$pdays==999 ~ "No", !full$pdays==999 ~ "Yes")
+
+#Validate previously contacted variable
+#full %>% filter(!full$pdays==999)
+
+ggplot(full) + geom_bar(mapping = aes(x=prevly_Cntctd, fill = y)) + ggtitle("Number of 'y' by whether customers were prev.contacted or not") +
+  ylab("Cnt") + xlab("Previously contacted?")
+
+```
+
+Same observation here as above: Most folks had no previous campaign but if they did, it looks like most who had a previous campaign decided to subscribe / likely to say "Yes"
+
+```{r}
+#Analysing campaign
+ggplot(full) + 
+  geom_histogram(mapping = aes(x=campaign, fill=y)) +
+  ggtitle("Distribution of 'y' by campaign")
+```
+- Just visually, when we decided to stop contacting a person it didn't affect our closing ratio which still dropped off precipitously 
+
+- Ideally, the campaign would stop contacting people who are less likely to subscribe, and keep contacting people if they are more likely to subscribe.  Then we should see the ratio of Yes to No go up as the number of no contacts goes up.  Instead, it looks like the ratio stays the same and the number of Yes's drops proportionately with the number of No's. 
+
+```{r}
+#Analyzing job
+ggplot(full) + 
+  geom_bar(mapping = aes(x=job, fill = y)) + 
+  coord_flip() +     #Added coord flip here to make it more readable
+  ggtitle("Number of 'y' by job") +
+  ylab("Count") + 
+  xlab("Job")
+
+```
+
+"y" - has a client subscribed a term deposit? : admin, technician and blue collar jobs are the top 3 subscribers by volume 
+
+```{r}
+df <- full %>%
+  group_by(job) %>%
+  count(y) %>%
+  mutate(job_conv = n/sum(n)) %>%
+  filter(y == "yes")
+
+ggplot(df, aes(x=job, y=job_conv)) +
+  geom_point() +
+  coord_flip() 
+```
+
+Above, I looked at the ratio of "yes" vs "no" and see that students and retired persons convert at much higher rates than those of other professions. And 'blue collar' has the lowest conversion rate
+
+So, if they were to want to improve the cost effectiveness of their campaigns they might want to target more 'students' and 'retirees'
+
+
+```{r}
+#Analyzing marital
+ggplot(full) + 
+  geom_bar(mapping = aes(x=marital, fill = y)) + 
+  ggtitle("Number of 'y' by marital") +
+  ylab("Cnt") + 
+  xlab("marital")
+
+```
+
+- More 'married' people are represented in the campaign
+- Visually looking, conversion rate seems to be higher for 'single' people
+
+```{r}
+#Analyzing duration and creating duration group variable
+
+full$duration_group <- 
+  cut(full$duration, 
+      breaks = c(5,30,60,300,600,Inf), 
+      labels = c("5-30s", "30-60s", "1-5 min", "5-10min", "10+"))
+
+df2 <- full %>%
+  group_by(duration_group) %>%
+  count(y) %>%
+  mutate(duration_group_conv = n/sum(n)) %>%
+  filter(y == "yes")
+
+ggplot(df2, aes(x=duration_group, y=duration_group_conv)) +
+  geom_point() +
+  facet_wrap(~ y)
+```
+
+- Looking above, clearly conversion rate goes up the longer the most recent call
