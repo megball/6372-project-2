@@ -17,6 +17,7 @@ library(e1071)
 library(class)
 library(gridExtra)
 library(summarytools)
+library(gt)
 
 ```
 
@@ -37,6 +38,12 @@ full <- janitor::clean_names(full)
 summary(full)
 print(dfSummary(full, graph.magnif = 0.75), method = 'browser')
 str(full)
+
+# Check for missing values
+tibble(variable = names(colSums(is.na(full))),
+       missing = colSums(is.na(full))) %>% 
+  gt() %>% 
+  tab_header(title = "Missing Values in Data") 
 
 
 ```
@@ -126,7 +133,7 @@ Highest frequency appears to be less than 10 days since last contact. Let's make
 
 ```{r}
 #prevly_Cntctd Yes/No. TO see the distribution or 'Y' on first time contact vs. a follow up
-full$prevly_Cntctd <- case_when(full$pdays==999 ~ "No", !full$pdays==999 ~ "Yes")
+full$prevly_Cntctd <- as.factor(case_when(full$pdays==999 ~ "No", !full$pdays==999 ~ "Yes"))
 
 #Validate previously contacted variable
 #full %>% filter(!full$pdays==999)
@@ -193,11 +200,19 @@ ggplot(full) +
 
 ```{r}
 #Analyzing duration and creating duration group variable
+summary(full$duration)
 
 full$duration_group <- 
   cut(full$duration, 
-      breaks = c(5,30,60,300,600,Inf), 
-      labels = c("5-30s", "30-60s", "1-5 min", "5-10min", "10+"))
+      breaks = c(-Inf,100,60,300,600,Inf), 
+      labels = c("0-30s", "30-60s", "1-5 min", "5-10min", "10+ min"))
+
+# Check for missing values
+tibble(variable = names(colSums(is.na(full))),
+       missing = colSums(is.na(full))) %>% 
+  gt() %>% 
+  tab_header(title = "Missing Values in Data")
+
 
 df2 <- full %>%
   group_by(duration_group) %>%
@@ -211,3 +226,34 @@ ggplot(df2, aes(x=duration_group, y=duration_group_conv)) +
 ```
 
 - Looking above, clearly conversion rate goes up the longer the most recent call
+
+##Feature Selection
+
+#Run random forest on down-sampled data set to check for variable importance
+```{r}
+#move response variable to end of data set
+full <- full %>% relocate(y, .after = last_col())
+
+#randomly sample 2000 observations
+sample2k <- sample_n(full, 2000)
+
+#down sample to balance response
+downsample <- downSample(x = sample2k[, -24],
+                         y = sample2k$y)
+table(downsample$Class)
+
+
+RFcontrol <- rfeControl(functions=rfFuncs, method="cv", number=5, verbose = FALSE)
+
+set.seed(123)
+subsets <- c(1:5, 10, 15, 20)
+RFresults <- rfe(downsample[,1:23], downsample[[24]], sizes=subsets, rfeControl=RFcontrol)
+RFresults
+varImp(RFresults)
+```
+
+#Check correlations
+```{r}
+
+```
+
