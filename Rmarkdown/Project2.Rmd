@@ -18,7 +18,7 @@ library(class)
 library(gridExtra)
 library(summarytools)
 library(gt)
-
+library(corrplot)
 ```
 
 ```{r Import data}
@@ -59,6 +59,9 @@ cols <- c("job", "marital", "education", "default","housing","loan","contact","m
 full[cols] <- lapply(full[cols], factor) 
 
 str(full)
+
+#make sure "success" level is defined as "yes"
+str(full$y)
 
 ```
 
@@ -226,6 +229,18 @@ ggplot(df2, aes(x=duration_group, y=duration_group_conv)) +
 ```
 
 - Looking above, clearly conversion rate goes up the longer the most recent call
+
+#Checking for correlation
+```{r}
+#Create corrplot for numeric variables
+correlations <- cor(full[,c(1,11:13,16:20)])
+corrplot(correlations)
+
+#too many variables to run 
+#pairs(full,col=full$y)
+
+
+```
 
 ##Feature Selection
 
