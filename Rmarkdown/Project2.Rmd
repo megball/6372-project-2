@@ -52,23 +52,51 @@ Looking at the dfsummary, there doesnt seem to be missing data in terms of just 
 
 pdays: number of days that passed by after the client was last contacted from a previous campaign (numeric; 999 means client was not previously contacted)
 
+# Remove missing values
+```{r}
+#remove "unknowns" based on small sample sizes compared to full data set
+df <- full %>%
+  filter(loan != "unknown")
+
+#down to 40,198 obs
+
+df <- df %>%
+  filter(marital != "unknown")
+
+#down to 40,119 obs
+
+df <- df %>%
+  filter(education != "unknown")
+
+#down to 38,437 obs
+
+#TBD on how to deal with default = uknown
+
+#recheck summary
+summary(df)
+
+```
+
+Our yes group has decreased by about ~400 to 4,277.
+
+
 ```{r}
 #change some variables to factor
 cols <- c("job", "marital", "education", "default","housing","loan","contact","month","day_of_week","poutcome","y")
 
-full[cols] <- lapply(full[cols], factor) 
+df[cols] <- lapply(df[cols], factor) 
 
-str(full)
+str(df)
 
 #make sure "success" level is defined as "yes"
-str(full$y)
+str(df$y)
 
 ```
 
-#Exploratory Data Analysis
+# Exploratory Data Analysis
 
 ```{r}
-df_yes <- full %>%
+df_yes <- df %>%
   filter(y=="yes")
 #summary(df_yes)
 
@@ -78,11 +106,11 @@ df_yes <- full %>%
 #   ggtitle("Employment Variation Rate vs Age") + 
 #   facet_wrap(~ y)
 
-ggplot(full, aes(x=age, y=duration, color = y)) +
+ggplot(df, aes(x=age, y=duration, color = y)) +
   geom_point(size=1, shape="circle") + 
   ggtitle("Duration vs Age")
 
-ggplot(full, aes(x=age, y=cons_price_idx, color = y)) +
+ggplot(df, aes(x=age, y=cons_price_idx, color = y)) +
   geom_point(size=1, shape="circle") + 
   ggtitle("Consumer Price Index vs Age") 
 
@@ -94,29 +122,32 @@ ggplot(full, aes(x=age, y=cons_price_idx, color = y)) +
 
 Duration vs Age: The duration of last contact (in seconds) was longer for ages 25-50. And it was understandably longer for "yes" vs for "no"
 
-#Making new age group
+# Making new age group
 ```{r}
 #Analysing Age
-ggplot(full) + geom_histogram(mapping = aes(x=age, fill=y)) +ggtitle("Distribution of 'y' by age")
+ggplot(df) + geom_histogram(mapping = aes(x=age, fill=y)) +ggtitle("Distribution of 'y' by age")
 ```
 
 ```{r}
 #Creating new variables
 #Age_Grp - split the data into age groups "17-31","32-37" ,"38-47", "47-55", ">55" (based in IQR)
-full$Age_Grp <- cut(full$age, breaks = c(16,31,37,46,55,98), labels = c("17-31","32-37" ,"38-47", "47-55", ">55"))
+df$Age_Grp <- cut(df$age, breaks = c(16,31,37,46,55,98), labels = c("17-31","32-37" ,"38-47", "47-55", ">55"))
 
 #validate the cut command
-#full %>% filter(!$Age_Grp  %in% c("17-31","32-37" ,"38-47", "47-55", ">55"))
-#full %>% filter(full$age==55)
+#df %>% filter(!$Age_Grp  %in% c("17-31","32-37" ,"38-47", "47-55", ">55"))
+#df %>% filter(df$age==55)
 
-ggplot(full) + geom_bar(mapping = aes(x=Age_Grp, fill = y)) + ggtitle("Distribution of 'y' by Age_Grp") +
+ggplot(df) + geom_bar(mapping = aes(x=Age_Grp, fill = y)) + ggtitle("Distribution of 'y' by Age_Grp") +
   ylab("Cnt") + xlab("Age Group")
 
 
 ```
+
+We will keep both age and age group in our model to see if one is selected over the other. We need to make sure to not use both in our model building.
+
 ```{r}
 #Analyzing pdays
-ggplot(full) + geom_histogram(mapping = aes(x=pdays, fill=y))
+ggplot(df) + geom_histogram(mapping = aes(x=pdays, fill=y))
 ```
 
 - Analyzing 'pdays' ie., number of days that passed by after the client was last contacted from a previous campaign (numeric; 999 means client was not previously contacted)
@@ -125,7 +156,7 @@ ggplot(full) + geom_histogram(mapping = aes(x=pdays, fill=y))
 
 ```{r}
 #zoom in for ones that were previously contacted
-full %>%
+df %>%
   filter(pdays < 999) %>%
   ggplot() +
   geom_histogram(mapping = aes(x=pdays, fill=y))
@@ -136,21 +167,25 @@ Highest frequency appears to be less than 10 days since last contact. Let's make
 
 ```{r}
 #prevly_Cntctd Yes/No. TO see the distribution or 'Y' on first time contact vs. a follow up
-full$prevly_Cntctd <- as.factor(case_when(full$pdays==999 ~ "No", !full$pdays==999 ~ "Yes"))
+df$prevly_Cntctd <- as.factor(case_when(df$pdays==999 ~ "No", !df$pdays==999 ~ "Yes"))
 
 #Validate previously contacted variable
-#full %>% filter(!full$pdays==999)
+#df %>% filter(!df$pdays==999)
 
-ggplot(full) + geom_bar(mapping = aes(x=prevly_Cntctd, fill = y)) + ggtitle("Number of 'y' by whether customers were prev.contacted or not") +
+ggplot(df) + geom_bar(mapping = aes(x=prevly_Cntctd, fill = y)) + ggtitle("Number of 'y' by whether customers were prev.contacted or not") +
   ylab("Cnt") + xlab("Previously contacted?")
 
 ```
 
-Same observation here as above: Most folks had no previous campaign but if they did, it looks like most who had a previous campaign decided to subscribe / likely to say "Yes"
+Same observation here as above: Most folks had no previous campaign but if they did, it looks like most who had a previous campaign decided to subscribe / likely to say "Yes". Since we have now created a new variable dependent on pdays, proceed to remove pdays to avoid issues with multicollinearity. Additionally, poutcome is dependent on whether or not someone has previously been contacted, and we have 'nonexistent' at 86% of the data. Remove this variable as well since it doesn't add much value and is dependent on pdays/previously contacted.
+
+```{r}
+df <- df %>% select(-pdays, -poutcome)
+```
 
 ```{r}
 #Analysing campaign
-ggplot(full) + 
+ggplot(df) + 
   geom_histogram(mapping = aes(x=campaign, fill=y)) +
   ggtitle("Distribution of 'y' by campaign")
 ```
@@ -160,7 +195,7 @@ ggplot(full) +
 
 ```{r}
 #Analyzing job
-ggplot(full) + 
+ggplot(df) + 
   geom_bar(mapping = aes(x=job, fill = y)) + 
   coord_flip() +     #Added coord flip here to make it more readable
   ggtitle("Number of 'y' by job") +
@@ -172,13 +207,13 @@ ggplot(full) +
 "y" - has a client subscribed a term deposit? : admin, technician and blue collar jobs are the top 3 subscribers by volume 
 
 ```{r}
-df <- full %>%
+df2 <- df %>%
   group_by(job) %>%
   count(y) %>%
   mutate(job_conv = n/sum(n)) %>%
   filter(y == "yes")
 
-ggplot(df, aes(x=job, y=job_conv)) +
+ggplot(df2, aes(x=job, y=job_conv)) +
   geom_point() +
   coord_flip() 
 ```
@@ -190,7 +225,7 @@ So, if they were to want to improve the cost effectiveness of their campaigns th
 
 ```{r}
 #Analyzing marital
-ggplot(full) + 
+ggplot(df) + 
   geom_bar(mapping = aes(x=marital, fill = y)) + 
   ggtitle("Number of 'y' by marital") +
   ylab("Cnt") + 
@@ -203,65 +238,82 @@ ggplot(full) +
 
 ```{r}
 #Analyzing duration and creating duration group variable
-summary(full$duration)
+summary(df$duration)
 
-full$duration_group <- 
-  cut(full$duration, 
+df$duration_group <- 
+  cut(df$duration, 
       breaks = c(-Inf,100,60,300,600,Inf), 
       labels = c("0-30s", "30-60s", "1-5 min", "5-10min", "10+ min"))
 
 # Check for missing values
-tibble(variable = names(colSums(is.na(full))),
-       missing = colSums(is.na(full))) %>% 
+tibble(variable = names(colSums(is.na(df))),
+       missing = colSums(is.na(df))) %>% 
   gt() %>% 
   tab_header(title = "Missing Values in Data")
 
 
-df2 <- full %>%
+df3 <- df %>%
   group_by(duration_group) %>%
   count(y) %>%
   mutate(duration_group_conv = n/sum(n)) %>%
   filter(y == "yes")
 
-ggplot(df2, aes(x=duration_group, y=duration_group_conv)) +
+ggplot(df3, aes(x=duration_group, y=duration_group_conv)) +
   geom_point() +
   facet_wrap(~ y)
 ```
 
 - Looking above, clearly conversion rate goes up the longer the most recent call
 
-#Checking for correlation
+# Checking for correlation
 ```{r}
 # Look for high correlation
-full.numeric <- full[ , sapply(full, is.numeric)]
+df.numeric <- df[ , sapply(df, is.numeric)]
 
-corrs = cor(full.numeric, use="everything") # Calculate correlations between all variables
-high_corrs = findCorrelation(corrs, cutoff=0.1)  # Find 'high' correlations among those variables (0.1 is not exactly "high" but there are so few numerics...)
-corrs = cor(full.numeric[,high_corrs], use="everything") # get a data frame with only highly correlated variables
+corrs = cor(df.numeric, use="everything") # Calculate correlations between all variables
+high_corrs = findCorrelation(corrs, cutoff=abs(0.1))  # Find 'high' correlations among those variables (0.1 is not exactly "high" but there are so few numerics...)
+corrs = cor(df.numeric[,high_corrs], use="everything") # get a data frame with only highly correlated variables
 
 #Create corrplot for numeric variables
 corrplot(corrs)
 
 # pairs only on highly correlated variables... 
-pairs(corrs,col=full$y)
+pairs(corrs,col=df$y)
 
 
 ```
 
-##Feature Selection
+Based on the correlation plot above, we see high correlation between 'euribor3m' and 'emp_var_rate' and to a lesser degree with 'nr_employed.' We also see 'nr_employed' and 'emp_var_rate' also highly correlated, which makes sense since you would expect the number of employees to vary at the same time as the employment variation rate. Let us proceed with removal of 'emp_var_rate' as that appears to be correlated at a higher rate to euribor3m.
 
-#Run random forest on down-sampled data set to check for variable importance
+```{r}
+#remove emp_var_rate
+df <- df %>% select(-emp_var_rate)
+```
+
+#Check for correlation with categorical variables
+
+We cannot keep both age group and age. Should we remove age?
+
+We also need to either remove duration or duration group. 
+
+```{r}
+#run two models to see which variable is better?
+
+
+```
+
+## Feature Selection
+
+# Run random forest on down-sampled data set to check for variable importance
 ```{r}
 #move response variable to end of data set
-full <- full %>% relocate(y, .after = last_col())
+df <- df %>% relocate(y, .after = last_col())
 
-#randomly sample 2000 observations
-set.seed(123)
-sample2k <- sample_n(full, 2000)
 
 #down sample to balance response
-downsample <- downSample(x = sample2k[, -24],
-                         y = sample2k$y)
+set.seed(1)
+downsample <- downSample(x = df[, -22],
+                         y = df$y)
 table(downsample$Class)
 
 
@@ -269,26 +321,26 @@ RFcontrol <- rfeControl(functions=rfFuncs, method="cv", number=5, verbose = FALS
 
 set.seed(123)
 subsets <- c(1:5, 10, 15, 20)
-RFresults <- rfe(downsample[,1:23], downsample[[24]], sizes=subsets, rfeControl=RFcontrol)
+RFresults <- rfe(downsample[,1:21], downsample[[22]], sizes=subsets, rfeControl=RFcontrol)
 RFresults
 varImp(RFresults)
 ```
 
-#Train/Test Split
+# Train/Test Split
 ```{r}
 set.seed(1234)
-num_rows <- nrow(full)
+num_rows <- nrow(df)
 train_idx <- sample(1:num_rows, 0.8 * num_rows)
 test_idx <- setdiff(1:num_rows, train_idx)
-train <- full[train_idx, ]
-test <- full[test_idx, ]
+train <- df[train_idx, ]
+test <- df[test_idx, ]
 ```
 
 
 
-#Random Forest
+# Random Forest
 ```{r}
-fitRF <- train(y ~ duration + duration_group + euribor3m + nr_employed + month + emp_var_rate, 
+fitRF <- train(y ~ duration + duration_group + euribor3m + nr_employed + month, 
                data = train, 
                method = "rf", 
                trControl = trainControl(method="cv", number = 5),
