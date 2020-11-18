@@ -250,6 +250,7 @@ corrplot(correlations)
 full <- full %>% relocate(y, .after = last_col())
 
 #randomly sample 2000 observations
+set.seed(123)
 sample2k <- sample_n(full, 2000)
 
 #down sample to balance response
