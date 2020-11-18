@@ -232,12 +232,18 @@ ggplot(df2, aes(x=duration_group, y=duration_group_conv)) +
 
 #Checking for correlation
 ```{r}
-#Create corrplot for numeric variables
-correlations <- cor(full[,c(1,11:13,16:20)])
-corrplot(correlations)
+# Look for high correlation
+full.numeric <- full[ , sapply(full, is.numeric)]
 
-#too many variables to run 
-#pairs(full,col=full$y)
+corrs = cor(full.numeric, use="everything") # Calculate correlations between all variables
+high_corrs = findCorrelation(corrs, cutoff=0.1)  # Find 'high' correlations among those variables (0.1 is not exactly "high" but there are so few numerics...)
+corrs = cor(full.numeric[,high_corrs], use="everything") # get a data frame with only highly correlated variables
+
+#Create corrplot for numeric variables
+corrplot(corrs)
+
+# pairs only on highly correlated variables... 
+pairs(corrs,col=full$y)
 
 
 ```
@@ -268,8 +274,34 @@ RFresults
 varImp(RFresults)
 ```
 
-#Check correlations
+#Train/Test Split
 ```{r}
-
+set.seed(1234)
+num_rows <- nrow(full)
+train_idx <- sample(1:num_rows, 0.8 * num_rows)
+test_idx <- setdiff(1:num_rows, train_idx)
+train <- full[train_idx, ]
+test <- full[test_idx, ]
 ```
 
+
+
+#Random Forest
+```{r}
+fitRF <- train(y ~ duration + duration_group + euribor3m + nr_employed + month + emp_var_rate, 
+               data = train, 
+               method = "rf", 
+               trControl = trainControl(method="cv", number = 5),
+               preProcess = c("center","scale"))  
+fitRF
+```
+
+I ran a simple Random Forest on the top 6 variables from Megan's recursive feature elimination above. I got an accuracy over 90% on the training data. Let's see how we do on the test data. 
+
+
+```{r}
+predRF <- predict(fitRF, newdata = test)
+confusionMatrix(predRF, test$y)
+```
+
+Over 91% accuracy on the test data! Also, sensitivity is over 96% while specificity is not that great at 53.79%
