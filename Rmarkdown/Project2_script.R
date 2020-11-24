@@ -2,6 +2,10 @@
 #author: "Simerpreet & Megan"
 #date: "November 20, 2020"
 
+###################
+## Load Packages ##
+###################
+
 library(dplyr)
 library(tidyverse)
 library(ggplot2)
@@ -17,8 +21,13 @@ library(tidyselect)
 library(GGally)
 library(randomForest)
 library(car)
+library(ROCR)
+library(MASS)
+library(glmnet)
 
-
+################
+## Load Data ##
+###############
 
 #full <- read_delim(here::here("data", "bank-additional-full.csv"),';')
 full <- read.csv(file.choose(), sep=';')
@@ -61,8 +70,8 @@ df <- df %>%  filter(job != "unknown")
 nrow(df)
 #down to 38,245 obs
 #Remove column default from the analysis. REasons for removing the columns: 
-#1) After cleaning up the data set of the other 'unknowns', this column has 7,757 unkown values as well. With only 3 values as 'yes',and 30,485 as 'no', it is difficult to impute values
-#2) Practically, column default would need to be used before the campagn, the sales person needs to decide if the person wilth a default needs to be approached to or not, not after the campaign,
+#1) After cleaning up the data set of the other 'unknowns', this column has 7,757 unknown values as well. With only 3 values as 'yes',and 30,485 as 'no', it is difficult to impute values
+#2) Practically, column default would need to be used before the campaign, the sales person needs to decide if the person wilth a default needs to be approached to or not, not after the campaign,
 #so it appears that it is ok to let go of this column when predicting the outcome of the campaign. 
 
 #Keeping default in for now
@@ -89,7 +98,9 @@ str(df)
 str(df$y)
 #```
 
-# Exploratory Data Analysis
+################################
+## Exploratory Data Analysis ##
+################################
 
 #run first pass PCA to see if we have useful numeric predictors
 df.numeric <- df[ , sapply(df, is.numeric)]
@@ -98,9 +109,11 @@ pc.result<-prcomp(df.numeric,scale.=TRUE)
 pc.scores<-pc.result$x
 pc.scores<-data.frame(pc.scores)
 pc.scores$y<-df$y
+pc.scores
 
 #Scree plot
 eigenvals<-(pc.result$sdev)^2
+eigenvals
 plot(1:8,eigenvals/sum(eigenvals),type="l",main="Scree Plot PC's",ylab="Prop. Var. Explained",ylim=c(0,1))
 cumulative.prop<-cumsum(eigenvals/sum(eigenvals))
 lines(1:8,cumulative.prop,lty=2)
@@ -258,18 +271,23 @@ df3 <- df %>%  group_by(duration_group) %>%  count(y) %>%  mutate(duration_group
 
 # Checking for correlation
 
-# Look for high correlation
-df.numeric <- df[ , sapply(df, is.numeric)]
-corrs = cor(df.numeric, use="everything") # Calculate correlations between all variables
-high_corrs = findCorrelation(corrs, cutoff=abs(0.1))  # Find 'high' correlations among those variables (0.1 is not exactly "high" but there are so few numerics...)
-corrs = cor(df.numeric[,high_corrs], use="everything") # get a data frame with only highly correlated variables
-#Create corrplot for numeric variables
-corrplot(corrs)
-# pairs only on highly correlated variables... 
-pairs(corrs,col=df$y)
+# Convert data to numeric
+corrs <- data.frame(lapply(df, as.integer))
+# Plot the graph
+ggcorr(corrs,
+       method = c("pairwise", "spearman"),
+       nbreaks = 6,
+       hjust = 0.8,
+       label = TRUE,
+       label_size = 3,
+       color = "grey50")
 
 
-#Based on the correlation plot above, we see high correlation between 'euribor3m' and 'emp_var_rate' and to a lesser degree with 'nr_employed.' We also see 'nr_employed' and 'emp_var_rate' also highly correlated, which makes sense since you would expect the number of employees to vary at the same time as the employment variation rate. Let us proceed with removal of 'emp_var_rate' as that appears to be correlated at a higher rate to euribor3m.
+#Based on the correlation plot above, we see high correlation between 'euribor3m' and 'emp_var_rate' 
+#and to a lesser degree with 'nr_employed.' We also see 'nr_employed' and 'emp_var_rate' also highly 
+#correlated, which makes sense since you would expect the number of employees to vary at the same time
+#as the employment variation rate. We will use VIF and feature selection tools in our model building
+#to determine which to remove.
 
 
 #remove emp_var_rate
@@ -312,10 +330,20 @@ str(df)
 
 #df <- df %>% select(-duration_group, -Age_Grp)
 
-# Train/Test Split
+#save dataset to this point
+df_clean <- write.csv(df, "data/df_clean.csv", row.names = FALSE)
+
+#open saved dataframe
+#df <- read.csv(here::here("data", "df_clean.csv"), stringsAsFactors = TRUE)
+#str(df)
+
+######################
+## Train/Test Split ##
+######################
 
 #Simer train/test split. Making sure the train and test set get enough 'yes' variables. 
 summary(df)
+#38245 obs. of 24 variables
 
 set.seed(1234) 
 
@@ -346,7 +374,12 @@ nrow(train %>% filter(y=='yes')) #3,406
 nrow(test %>% filter(y=='yes'))  #852
 
 summary(train)
+#30595 obs. of 24 variables
 
+
+##############################
+### Simple Logistic Model ###
+##############################
 
 # Run Initial Logistic Regression
 #Simple regression model
@@ -375,10 +408,11 @@ simple.log<-glm(y~.,family="binomial",data=train_simple_2)
 summary(simple.log)
 exp(cbind("Odds ratio" = coef(simple.log), confint.default(simple.log, level = 0.95)))
 vif(simple.log)
-#poutcome and prevly_Cntctd have higher vifs but let's keeo both of them.
+#poutcome and prevly_Cntctd have higher vifs but let's keep both of them.
+#MB comment: I think we should take out poutcome at VIF of 24!
 
 #Remove statistically insignificant variables and run the model again
-train_simple_3 <- train_simple_2 %>% dplyr::select(-marital,-day_of_week, -loan, -housing,-previous  )
+train_simple_3 <- train_simple_2 %>% dplyr::select(-marital,-day_of_week, -loan, -housing,-previous)
 
 #Check model again
 simple.log<-glm(y~.,family="binomial",data=train_simple_3)
@@ -393,20 +427,43 @@ summary(simple.log)
 exp(cbind("Odds ratio" = coef(simple.log), confint.default(simple.log, level = 0.95)))
 vif(simple.log)
 #Prediction using simple model
-fit.pred.simple<-predict(simple.log,newdata=test,type="response")
+fit.pred.simple<-predict(simple.log,newdata=test, type="response")
 
+class.simple<-factor(ifelse(fit.pred.simple>0.5,"yes","no"),levels=c("no","yes"))
+# use caret and compute a confusion matrix
+confusionMatrix(class.simple,test$y)
+
+#MB add - running without poutcome
+#simple model -2
+simple.log2<-glm(y~job+education+default+contact+month+duration+campaign+cons_price_idx+cons_conf_idx+euribor3m+Age_Grp+prevly_Cntctd,family="binomial",data=train)
+#simple.log<-glm(y~.,family="binomial",data=train_simple_3)
+summary(simple.log2)
+exp(cbind("Odds ratio" = coef(simple.log2), confint.default(simple.log2, level = 0.95)))
+vif(simple.log2)
+
+summary(simple.log2)
+
+#Prediction using simple model
+fit.pred.simple2<-predict(simple.log2,newdata=test,type="response")
+class.simple2<-factor(ifelse(fit.pred.simple2>0.5,"yes","no"),levels=c("no","yes"))
+# use caret and compute a confusion matrix
+confusionMatrix(class.simple2,test$y)
+
+#No change in metrics, both around 92% and sens. at 97%, spec. at 42%. OK to keep in poutcome
+
+##########
+## STEP ##
+##########
 
 # Feature selection using step
-library(MASS)
-library(car) # for VIF
 full.log<-glm(y~.,family="binomial",data=train)
 step.log<-full.log %>% stepAIC(trace=FALSE)
 summary(step.log)
 #exp(cbind("Odds ratio" = coef(step.log), confint.default(step.log, level = 0.95)))
-vif(step.log)  
+vif(step.log)
 
 #Remove variables with high vifs and run the model again
-train_step <- train %>% dplyr::select(-emp_var_rate )
+train_step <- train %>% dplyr::select(-emp_var_rate)
 #Check vifs again
 full.log<-glm(y~.,family="binomial",data=train_step)
 step.log<-full.log %>% stepAIC(trace=FALSE)
@@ -415,7 +472,7 @@ summary(step.log)
 vif(step.log)  
 
 #euribor and nr_employed are both statistically significant in the model but have high VIFs.Removing nr_employed
-train_step_2 <- train_step %>% dplyr::select(-nr_employed )
+train_step_2 <- train_step %>% dplyr::select(-nr_employed)
 
 full.log<-glm(y~.,family="binomial",data=train_step_2)
 step.log<-full.log %>% stepAIC(trace=FALSE)
@@ -429,7 +486,7 @@ full.log<-glm(y~.,family="binomial",data=train_step_3)
 step.log<-full.log %>% stepAIC(trace=FALSE)
 summary(step.log)
 #exp(cbind("Odds ratio" = coef(step.log), confint.default(step.log, level = 0.95)))
-vif(step.log)  
+vif(step.log)
 
 
 full.log<-glm(y~education+default+contact+month+duration+campaign+poutcome+cons_price_idx+euribor3m+Age_Grp,family="binomial",data=train)
@@ -453,6 +510,7 @@ vif(step.log)
 #education is border line and contact became insignificant. Remove contact from the model
 
 #Run step model again
+#final model using stepwise for feature selection
 full.log<-glm(y~education+default+month+duration+campaign+poutcome+cons_price_idx+euribor3m+Age_Grp,family="binomial",data=train)
 #full.log<-glm(y~.,family="binomial",data=train)
 step.log<-full.log %>% stepAIC(trace=FALSE)
@@ -460,15 +518,23 @@ summary(step.log)
 
 #education becomes statistically significant after removing contact. VIFs look good.
 #exp(cbind("Odds ratio" = coef(step.log), confint.default(step.log, level = 0.95)))
-vif(step.log) 
+vif(step.log)
 #Predicting using step 
 fit.pred.step<-predict(step.log,newdata=test,type="response")
 test$y[1:15]
 fit.pred.step[1:15]
 
+class.step1<-factor(ifelse(fit.pred.step>0.5,"yes","no"),levels=c("no","yes"))
+# use caret and compute a confusion matrix
+confusionMatrix(class.step1,test$y)
+  #Acc 91%, Sens. 97%, Spec. 42%
+
+###########
+## LASSO ##
+###########
 
 # Feature selection using lasso
-library(glmnet)
+
 dat.train.x <- model.matrix(y~.,train)
 dat.train.y<-train[,24]
 cvfit <- cv.glmnet(dat.train.x, dat.train.y, family = "binomial", type.measure = "class", nlambda = 1000)
@@ -477,12 +543,17 @@ coef(cvfit, s = "lambda.min")
 #CV misclassification error rate is little below .1
 print("CV Error Rate:")
 cvfit$cvm[which(cvfit$lambda==cvfit$lambda.min)]
+#"CV Error Rate:"
+#0.09053767
 
 #Optimal penalty
 print("Penalty Value:")
 cvfit$lambda.min
+#"Penalty Value:"
+#0.001054887
 finalmodel<-glmnet(dat.train.x, dat.train.y, family = "binomial",lambda=cvfit$lambda.min)
 finalmodel$call
+finalmodel
 
 dat.test.x<-model.matrix(y~.,test)
 fit.pred.lasso <- predict(finalmodel, newx = dat.test.x, type = "response")
@@ -490,8 +561,13 @@ fit.pred.lasso <- predict(finalmodel, newx = dat.test.x, type = "response")
 test$y[1:15]
 fit.pred.lasso[1:15]
 
+#confusion matrix at 0.5 cutoff
+class.lasso1<-factor(ifelse(fit.pred.lasso>0.5,"yes","no"),levels=c("no","yes"))
+# use caret and compute a confusion matrix
+confusionMatrix(class.lasso1,test$y)
+#Acc 91%, Sens. 97%, Spec. 45%
+
 #ROCR
-library(ROCR)
 results.lasso<-prediction(fit.pred.lasso, test$y,label.ordering=c("no","yes"))
 roc.lasso = performance(results.lasso, measure = "tpr", x.measure = "fpr")
 plot(roc.lasso,colorize = TRUE)
@@ -507,7 +583,7 @@ fit.pred.origin<-predict(simple.log,newdata=test,type="response")
 results.origin<-prediction(fit.pred.origin,test$y,label.ordering=c("no","yes"))
 roc.origin=performance(results.origin,measure = "tpr", x.measure = "fpr")
 
-plot( roc.lasso)
+plot(roc.lasso)
 plot(roc.step,col="orange", add = TRUE)
 plot(roc.origin,col="blue",add=TRUE)
 legend("bottomright",legend=c("Lasso","Stepwise","Simple"),col=c("black","orange","blue"),lty=1,lwd=1)
@@ -669,3 +745,99 @@ Sensitivity
 Specificity
 Accuracy
 
+##############################
+### Complex Logistic Model ###
+##############################
+
+# Run Initial Logistic Regression allowing for interaction
+#start with only variables from best simple model
+complex.log<-glm(y~ education * default * month * duration * campaign * poutcome * cons_price_idx * euribor3m * Age_Grp,family="binomial",data=train)
+summary(complex.log)
+exp(cbind("Odds ratio" = coef(complex.log), confint.default(complex.log, level = 0.95)))
+vif(complex.log)
+
+
+#################
+## LDA & QDA ###
+################
+
+#Training Set
+train.lda.x <- train[ , sapply(train, is.numeric)]
+
+train.lda.y <- train$y
+
+fit.lda <- lda(train.lda.y ~ ., data = train.lda.x)
+pred.lda <- predict(fit.lda, newdata = train.lda.x)
+
+preds <- pred.lda$posterior
+preds <- as.data.frame(preds)
+
+pred <- prediction(preds[,2],train.lda.y)
+roc.perf = performance(pred, measure = "tpr", x.measure = "fpr")
+auc.train <- performance(pred, measure = "auc")
+auc.train <- auc.train@y.values
+plot(roc.perf)
+abline(a=0, b= 1)
+text(x = .40, y = .6,paste("AUC = ", round(auc.train[[1]],3), sep = ""))
+#AUC = 0.921
+
+# Test Set
+test.lda.x <- test[ , sapply(test, is.numeric)]
+
+test.lda.y <- test$y
+
+pred.lda1 <- predict(fit.lda, newdata = test.lda.x)
+
+preds1 <- pred.lda1$posterior
+preds1 <- as.data.frame(preds1)
+
+pred1 <- prediction(preds1[,2],test.lda.y)
+roc.perf = performance(pred1, measure = "tpr", x.measure = "fpr")
+auc.train <- performance(pred1, measure = "auc")
+auc.train <- auc.train@y.values
+plot(roc.perf)
+abline(a=0, b= 1)
+text(x = .40, y = .6,paste("AUC = ", round(auc.train[[1]],3), sep = ""))
+#AUC = 0.919
+
+#running cv on train set using LDA
+nloops<-50   #number of CV loops
+ntrains<-dim(train.lda.x)[1]  #No. of samples in training data set
+cv.aucs<-c()
+dat.train.yshuf<-train.lda.y[sample(1:length(train.lda.y))]
+
+set.seed(123)
+for (i in 1:nloops){
+  index<-sample(1:ntrains,ntrains*.8)
+  cvtrain.x<-train.lda.x[index,]
+  cvtest.x<-train.lda.x[-index,]
+  cvtrain.y<-dat.train.yshuf[index]
+  cvtest.y<-dat.train.yshuf[-index]
+  
+  cvfit <- lda(cvtrain.y ~ ., data = cvtrain.x)
+  fit.pred <- predict(cvfit, newdata = cvtest.x)
+  preds.cv <- fit.pred$posterior
+  preds.cv <- as.data.frame(preds.cv)
+  pred.cv <- prediction(preds.cv[,2], cvtest.y)
+  roc.perf = performance(pred.cv, measure = "tpr", x.measure = "fpr")
+  auc.train <- performance(pred.cv, measure = "auc")
+  auc.train <- auc.train@y.values
+  
+  cv.aucs[i]<-auc.train[[1]]
+}
+
+hist(cv.aucs)
+summary(cv.aucs)
+#Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+#0.4763  0.4916  0.4975  0.4974  0.5031  0.5145
+
+###################
+## Random Forest ##
+###################
+
+
+
+
+######################
+## Model Comparison ##
+######################

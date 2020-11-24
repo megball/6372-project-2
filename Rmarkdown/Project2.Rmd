@@ -19,6 +19,7 @@ library(gridExtra)
 library(summarytools)
 library(gt)
 library(corrplot)
+library(GGally)
 ```
 
 ```{r Import data}
@@ -70,19 +71,29 @@ df <- df %>%
 
 #down to 38,437 obs
 
-#TBD on how to deal with default = uknown
+df <- df %>%  filter(job != "unknown")
+nrow(df)
 
 #recheck summary
 summary(df)
 
 ```
 
-Our yes group has decreased by about ~400 to 4,277.
+Remove column default from the analysis. REasons for removing the columns: 
+1) After cleaning up the data set of the other 'unknowns', this column has 7,757 unknown values as well. With only 3 values as 'yes',and 30,485 as 'no', it is difficult to impute values
+2) Practically, column default would need to be used before the campaign, the sales person needs to decide if the person with a default needs to be approached to or not, not after the campaign, so it appears that it is ok to let go of this column when predicting the outcome of the campaign. 
+
+```{r}
+df <- df %>%  select(-c(default))
+nrow(df)
+str(df)
+summary(df)
+```
 
 
 ```{r}
 #change some variables to factor
-cols <- c("job", "marital", "education", "default","housing","loan","contact","month","day_of_week","poutcome","y")
+cols <- c("job", "marital", "education","housing","loan","contact","month","day_of_week","poutcome","y")
 
 df[cols] <- lapply(df[cols], factor) 
 
@@ -90,6 +101,7 @@ str(df)
 
 #make sure "success" level is defined as "yes"
 str(df$y)
+summary(df$y)
 
 ```
 
