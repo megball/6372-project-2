@@ -378,34 +378,35 @@ confusionMatrix(pred_model1,test$y)
 ```
 
 
-## Random Forest
-
- ---- Rinku will need to update based on the changes I made above ---
-
-# Train/Test Split
-```{r}
-#set.seed(1234)
-#num_rows <- nrow(df)
-#train_idx <- sample(1:num_rows, 0.8 * num_rows)
-#test_idx <- setdiff(1:num_rows, train_idx)
-#train <- df[train_idx, ]
-#test <- df[test_idx, ]
-```
-
-
-
 # Random Forest
 
-On the pre-processed dataset...
+Running Random Forest on the same pre-processed dataset as in the above glm
 
 ```{r}
+cv_5 <- trainControl(method="cv", 
+                        number = 5)
+
+set.seed(1234)
+rf_grid <- expand.grid(
+  mtry = 2:8,
+  splitrule = "gini",
+  min.node.size = c(1)
+  )
+
 fitRF <- train(y ~ ., 
                data = train, 
-               method = "rf", 
-               trControl = trainControl(method="cv", number = 5),
-               preProcess = c("center","scale"))  
+               method = "ranger", 
+               trControl = cv_5,
+               num.threads = 4,
+               tuneGrid=rf_grid)  
+
+#preProcess = c("center","scale")
+
 fitRF
+plot(fitRF)
 ```
+
+Optimal accuracy of 0.9157407 is happening at mtry=6
 
 
 ```{r}
@@ -413,19 +414,16 @@ confusionMatrix(fitRF)
 ```
 
 
-I ran a simple Random Forest on the top 6 variables from Megan's recursive feature elimination above. I got an accuracy over 90% on the training data. Let's see how we do on the test data. 
-
-
 ```{r}
 predRF <- predict(fitRF, newdata = test)
 confusionMatrix(predRF, test$y)
 ```
 
-Over 91% accuracy on the test data! Also, sensitivity is over 96% while specificity is not that great at 53.79%
+On the test set, this model gets an Accuracy of 91.46% with sensitivity is over 96% while specificity is not that great at 48.77%
 
-### Random Forest on full, unprocessed data
+### WIP - alternative approaches
 
-All I'm doing is turning the character fields into factors, then using downsampling to create a training dataset
+Here I'm experimenting with different approaches, including downsampling and allowing previously rejected variables. 
 
 ```{r}
 #move response variable to end of data set
@@ -473,7 +471,6 @@ confusionMatrix(fitRF)
 ```
 
 
-I ran a simple Random Forest on the top 6 variables from Megan's recursive feature elimination above. I got an accuracy over 90% on the training data. Let's see how we do on the test data. 
 
 
 ```{r}
@@ -481,5 +478,4 @@ predRF <- predict(fitRF, newdata = dfd)
 confusionMatrix(predRF, dfd$y)
 ```
 
-Over 91% accuracy on the test data! Also, sensitivity is over 96% while specificity is not that great at 53.79%
 
