@@ -2,6 +2,10 @@
 #author: "Simerpreet & Megan"
 #date: "November 20, 2020"
 
+###################
+## Load Packages ##
+###################
+
 library(dplyr)
 library(tidyverse)
 library(ggplot2)
@@ -17,8 +21,13 @@ library(tidyselect)
 library(GGally)
 library(randomForest)
 library(car)
+library(ROCR)
+library(MASS)
+library(glmnet)
 
-
+################
+## Load Data ##
+###############
 
 #full <- read_delim(here::here("data", "bank-additional-full.csv"),';')
 full <- read.csv(file.choose(), sep=';')
@@ -61,8 +70,8 @@ df <- df %>%  filter(job != "unknown")
 nrow(df)
 #down to 38,245 obs
 #Remove column default from the analysis. REasons for removing the columns: 
-#1) After cleaning up the data set of the other 'unknowns', this column has 7,757 unkown values as well. With only 3 values as 'yes',and 30,485 as 'no', it is difficult to impute values
-#2) Practically, column default would need to be used before the campagn, the sales person needs to decide if the person wilth a default needs to be approached to or not, not after the campaign,
+#1) After cleaning up the data set of the other 'unknowns', this column has 7,757 unknown values as well. With only 3 values as 'yes',and 30,485 as 'no', it is difficult to impute values
+#2) Practically, column default would need to be used before the campaign, the sales person needs to decide if the person wilth a default needs to be approached to or not, not after the campaign,
 #so it appears that it is ok to let go of this column when predicting the outcome of the campaign. 
 
 #Keeping default in for now
@@ -89,7 +98,9 @@ str(df)
 str(df$y)
 #```
 
-# Exploratory Data Analysis
+################################
+## Exploratory Data Analysis ##
+################################
 
 #run first pass PCA to see if we have useful numeric predictors
 df.numeric <- df[ , sapply(df, is.numeric)]
@@ -98,9 +109,11 @@ pc.result<-prcomp(df.numeric,scale.=TRUE)
 pc.scores<-pc.result$x
 pc.scores<-data.frame(pc.scores)
 pc.scores$y<-df$y
+pc.scores
 
 #Scree plot
 eigenvals<-(pc.result$sdev)^2
+eigenvals
 plot(1:8,eigenvals/sum(eigenvals),type="l",main="Scree Plot PC's",ylab="Prop. Var. Explained",ylim=c(0,1))
 cumulative.prop<-cumsum(eigenvals/sum(eigenvals))
 lines(1:8,cumulative.prop,lty=2)
@@ -258,18 +271,23 @@ df3 <- df %>%  group_by(duration_group) %>%  count(y) %>%  mutate(duration_group
 
 # Checking for correlation
 
-# Look for high correlation
-df.numeric <- df[ , sapply(df, is.numeric)]
-corrs = cor(df.numeric, use="everything") # Calculate correlations between all variables
-high_corrs = findCorrelation(corrs, cutoff=abs(0.1))  # Find 'high' correlations among those variables (0.1 is not exactly "high" but there are so few numerics...)
-corrs = cor(df.numeric[,high_corrs], use="everything") # get a data frame with only highly correlated variables
-#Create corrplot for numeric variables
-corrplot(corrs)
-# pairs only on highly correlated variables... 
-pairs(corrs,col=df$y)
+# Convert data to numeric
+corrs <- data.frame(lapply(df, as.integer))
+# Plot the graph
+ggcorr(corrs,
+       method = c("pairwise", "spearman"),
+       nbreaks = 6,
+       hjust = 0.8,
+       label = TRUE,
+       label_size = 3,
+       color = "grey50")
 
 
-#Based on the correlation plot above, we see high correlation between 'euribor3m' and 'emp_var_rate' and to a lesser degree with 'nr_employed.' We also see 'nr_employed' and 'emp_var_rate' also highly correlated, which makes sense since you would expect the number of employees to vary at the same time as the employment variation rate. Let us proceed with removal of 'emp_var_rate' as that appears to be correlated at a higher rate to euribor3m.
+#Based on the correlation plot above, we see high correlation between 'euribor3m' and 'emp_var_rate' 
+#and to a lesser degree with 'nr_employed.' We also see 'nr_employed' and 'emp_var_rate' also highly 
+#correlated, which makes sense since you would expect the number of employees to vary at the same time
+#as the employment variation rate. We will use VIF and feature selection tools in our model building
+#to determine which to remove.
 
 
 #remove emp_var_rate
@@ -312,7 +330,15 @@ str(df)
 
 #df <- df %>% select(-duration_group, -Age_Grp)
 
-# Train/Test Split
+#save dataset to this point
+df_clean <- write.csv(df, "data/df_clean.csv", row.names = FALSE)
+
+#open saved dataframe
+#df <- read.csv(here::here("data", "df_clean"))
+
+######################
+## Train/Test Split ##
+######################
 
 #Simer train/test split. Making sure the train and test set get enough 'yes' variables. 
 summary(df)
@@ -347,6 +373,10 @@ nrow(test %>% filter(y=='yes'))  #852
 
 summary(train)
 
+
+##############################
+### Simple Logistic Model ###
+##############################
 
 # Run Initial Logistic Regression
 #Simple regression model
@@ -397,8 +427,6 @@ fit.pred.simple<-predict(simple.log,newdata=test,type="response")
 
 
 # Feature selection using step
-library(MASS)
-library(car) # for VIF
 full.log<-glm(y~.,family="binomial",data=train)
 step.log<-full.log %>% stepAIC(trace=FALSE)
 summary(step.log)
@@ -468,7 +496,7 @@ fit.pred.step[1:15]
 
 
 # Feature selection using lasso
-library(glmnet)
+
 dat.train.x <- model.matrix(y~.,train)
 dat.train.y<-train[,24]
 cvfit <- cv.glmnet(dat.train.x, dat.train.y, family = "binomial", type.measure = "class", nlambda = 1000)
@@ -483,15 +511,17 @@ print("Penalty Value:")
 cvfit$lambda.min
 finalmodel<-glmnet(dat.train.x, dat.train.y, family = "binomial",lambda=cvfit$lambda.min)
 finalmodel$call
+finalmodel
 
 dat.test.x<-model.matrix(y~.,test)
 fit.pred.lasso <- predict(finalmodel, newx = dat.test.x, type = "response")
+#Megan: I get an error when trying to run above line, something with the dimensions of the model and the 
+#test set
 
 test$y[1:15]
 fit.pred.lasso[1:15]
 
 #ROCR
-library(ROCR)
 results.lasso<-prediction(fit.pred.lasso, test$y,label.ordering=c("no","yes"))
 roc.lasso = performance(results.lasso, measure = "tpr", x.measure = "fpr")
 plot(roc.lasso,colorize = TRUE)
@@ -507,7 +537,7 @@ fit.pred.origin<-predict(simple.log,newdata=test,type="response")
 results.origin<-prediction(fit.pred.origin,test$y,label.ordering=c("no","yes"))
 roc.origin=performance(results.origin,measure = "tpr", x.measure = "fpr")
 
-plot( roc.lasso)
+plot(roc.lasso)
 plot(roc.step,col="orange", add = TRUE)
 plot(roc.origin,col="blue",add=TRUE)
 legend("bottomright",legend=c("Lasso","Stepwise","Simple"),col=c("black","orange","blue"),lty=1,lwd=1)
@@ -669,3 +699,12 @@ Sensitivity
 Specificity
 Accuracy
 
+##############################
+### Complex Logistic Model ###
+##############################
+
+# Run Initial Logistic Regression allowing for interaction
+complex.log<-glm(y~.,family="binomial",data=train)
+summary(complex.log)
+exp(cbind("Odds ratio" = coef(complex.log), confint.default(complex.log, level = 0.95)))
+vif(complex.log)
