@@ -316,7 +316,7 @@ sample10k <- sample_n(df, 10000)
 
 #down sample to balance response
 set.seed(1)
-downsample <- downSample(x = sample10k[, -21],
+downsample <- downSample(x = sample10k[, -20],
                          y = sample10k$y)
 table(downsample$Class)
 
@@ -325,7 +325,7 @@ RFcontrol <- rfeControl(functions=rfFuncs, method="cv", number=5, verbose = FALS
 
 set.seed(123)
 subsets <- c(1:5, 10, 15, 20)
-RFresults <- rfe(downsample[,1:20], downsample[[21]], sizes=subsets, rfeControl=RFcontrol)
+RFresults <- rfe(downsample[,1:19], downsample[[20]], sizes=subsets, rfeControl=RFcontrol)
 RFresults
 varImp(RFresults)
 ```
