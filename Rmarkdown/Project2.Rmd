@@ -334,16 +334,24 @@ train_idx <- sample(1:num_rows, 0.8 * num_rows)
 test_idx <- setdiff(1:num_rows, train_idx)
 train <- df[train_idx, ]
 test <- df[test_idx, ]
+```
 
+```{r}
 #set train control parameters
 trControl <- trainControl(method = "cv", number = 10, classProbs = TRUE)
 
 model1 <- train(y ~., data = train, method = "glm", family = "binomial", trControl = trControl)
 model1
-summary(model1)
+```
 
+
+```{r}
+summary(model1)
 confusionMatrix(model1)
 ```
+
+
+
 ```{r}
 #make predictions and create confusion matrix
 pred_model1 <- predict(model1, newdata = test)
@@ -364,32 +372,102 @@ confusionMatrix(pred_model1,test$y)
 
 # Train/Test Split
 ```{r}
-set.seed(1234)
-num_rows <- nrow(df)
-train_idx <- sample(1:num_rows, 0.8 * num_rows)
-test_idx <- setdiff(1:num_rows, train_idx)
-train <- df[train_idx, ]
-test <- df[test_idx, ]
+#set.seed(1234)
+#num_rows <- nrow(df)
+#train_idx <- sample(1:num_rows, 0.8 * num_rows)
+#test_idx <- setdiff(1:num_rows, train_idx)
+#train <- df[train_idx, ]
+#test <- df[test_idx, ]
 ```
 
 
 
 # Random Forest
+
+On the pre-processed dataset...
+
 ```{r}
-#fitRF <- train(y ~ duration + duration_group + euribor3m + nr_employed + month, 
-#               data = train, 
-#               method = "rf", 
-#               trControl = trainControl(method="cv", number = 5),
-#               preProcess = c("center","scale"))  
-#fitRF
+fitRF <- train(y ~ ., 
+               data = train, 
+               method = "rf", 
+               trControl = trainControl(method="cv", number = 5),
+               preProcess = c("center","scale"))  
+fitRF
 ```
+
+
+```{r}
+confusionMatrix(fitRF)
+```
+
 
 I ran a simple Random Forest on the top 6 variables from Megan's recursive feature elimination above. I got an accuracy over 90% on the training data. Let's see how we do on the test data. 
 
 
 ```{r}
-#predRF <- predict(fitRF, newdata = test)
-#confusionMatrix(predRF, test$y)
+predRF <- predict(fitRF, newdata = test)
+confusionMatrix(predRF, test$y)
 ```
 
 Over 91% accuracy on the test data! Also, sensitivity is over 96% while specificity is not that great at 53.79%
+
+### Random Forest on full, unprocessed data
+
+All I'm doing is turning the character fields into factors, then using downsampling to create a training dataset
+
+```{r}
+#move response variable to end of data set
+dfd <- full %>% relocate(y, .after = last_col())
+
+dfd[sapply(dfd, is.character)] <- lapply(dfd[sapply(dfd, is.character)], 
+                                       as.factor)
+
+#down sample to balance response
+set.seed(1)
+downsample <- downSample(x = dfd[, -21],
+                         y = dfd$y)
+downsample <- downsample %>% rename(y = Class)
+table(downsample$y)
+```
+
+The down sampling produced a perfectly balanced dataset for training. 
+
+
+# Train/Test Split
+```{r}
+#dff <- downsample
+#set.seed(1234)
+#num_rows <- nrow(dff)
+#train_idx <- sample(1:num_rows, 0.8 * num_rows)
+#test_idx <- setdiff(1:num_rows, train_idx)
+#train <- dff[train_idx, ]
+#test <- dff[test_idx, ]
+```
+
+
+```{r}
+fitRF <- train(y ~ ., 
+               data = downsample, 
+               method = "rf", 
+               trControl = trainControl(method="cv", number = 5),
+               preProcess = c("center","scale"))  
+fitRF
+```
+
+Explanation: TBD
+
+```{r}
+confusionMatrix(fitRF)
+```
+
+
+I ran a simple Random Forest on the top 6 variables from Megan's recursive feature elimination above. I got an accuracy over 90% on the training data. Let's see how we do on the test data. 
+
+
+```{r}
+predRF <- predict(fitRF, newdata = dfd)
+confusionMatrix(predRF, dfd$y)
+```
+
+Over 91% accuracy on the test data! Also, sensitivity is over 96% while specificity is not that great at 53.79%
+
