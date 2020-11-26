@@ -103,30 +103,30 @@ str(df$y)
 ################################
 
 #run first pass PCA to see if we have useful numeric predictors
-df.numeric <- df[ , sapply(df, is.numeric)]
+df.numeric2 <- df[ , sapply(df, is.numeric)]
 
-pc.result<-prcomp(df.numeric,scale.=TRUE)
-pc.scores<-pc.result$x
-pc.scores<-data.frame(pc.scores)
-pc.scores$y<-df$y
-pc.scores
+pc.result2<-prcomp(df.numeric2,scale.=TRUE)
+pc.scores2<-pc.result2$x
+pc.scores2<-data.frame(pc.scores2)
+pc.scores2$y<-df$y
+pc.scores2
 
 #Scree plot
-eigenvals<-(pc.result$sdev)^2
-eigenvals
-plot(1:8,eigenvals/sum(eigenvals),type="l",main="Scree Plot PC's",ylab="Prop. Var. Explained",ylim=c(0,1))
-cumulative.prop<-cumsum(eigenvals/sum(eigenvals))
-lines(1:8,cumulative.prop,lty=2)
+eigenvals2<-(pc.result2$sdev)^2
+eigenvals2
+plot(1:10,eigenvals2/sum(eigenvals2),type="l",main="Scree Plot PC's",ylab="Prop. Var. Explained",ylim=c(0,1))
+cumulative.prop2<-cumsum(eigenvals2/sum(eigenvals2))
+lines(1:10,cumulative.prop2,lty=2)
 
 #Use ggplot2 to plot the first few pc's
-ggplot(data = pc.scores, aes(x = PC1, y = PC2)) +
+ggplot(data = pc.scores2, aes(x = PC1, y = PC2)) +
   geom_point(aes(col=y), size=1)+
-  ggtitle("PCA of Numeric Data")
+  ggtitle("PCA of Numeric Data post-EDA")
 #There is some separation, but it is not in a way we would hope for our response variable
 
-ggplot(data = pc.scores, aes(x = PC2, y = PC3)) +
+ggplot(data = pc.scores2, aes(x = PC2, y = PC3)) +
   geom_point(aes(col=y), size=1)+
-  ggtitle("PCA of Numeric Data")
+  ggtitle("PCA of Numeric Data post-EDA")
 
 ggplot(data = pc.scores, aes(x = PC3, y = PC4)) +
   geom_point(aes(col=y), size=1)+
@@ -336,6 +336,40 @@ df_clean <- write.csv(df, "data/df_clean.csv", row.names = FALSE)
 #open saved dataframe
 #df <- read.csv(here::here("data", "df_clean.csv"), stringsAsFactors = TRUE)
 #str(df)
+
+###############
+## PCA check ##
+###############
+
+#Re-run PCA after EDA - where we essentially just removed some unknown variables and therefore reduced overall sample size
+df.numeric2 <- df[ , sapply(df, is.numeric)]
+
+pc.result2<-prcomp(df.numeric2,scale.=TRUE)
+pc.scores2<-pc.result2$x
+pc.scores2<-data.frame(pc.scores2)
+pc.scores2$y<-df$y
+pc.scores2
+
+#Scree plot
+eigenvals2<-(pc.result2$sdev)^2
+eigenvals2
+plot(1:10,eigenvals2/sum(eigenvals2),type="l",main="Scree Plot PC's",ylab="Prop. Var. Explained",ylim=c(0,1))
+cumulative.prop2<-cumsum(eigenvals2/sum(eigenvals2))
+lines(1:10,cumulative.prop2,lty=2)
+
+#Use ggplot2 to plot the first few pc's
+ggplot(data = pc.scores2, aes(x = PC1, y = PC2)) +
+  geom_point(aes(col=y), size=1)+
+  ggtitle("PCA of Numeric Data post-EDA")
+#Looks almost exactly the same
+
+ggplot(data = pc.scores2, aes(x = PC2, y = PC3)) +
+  geom_point(aes(col=y), size=1)+
+  ggtitle("PCA of Numeric Data post-EDA")
+
+ggplot(data = pc.scores2, aes(x = PC3, y = PC4)) +
+  geom_point(aes(col=y), size=1)+
+  ggtitle("PCA of Numeric Data post-EDA")
 
 ######################
 ## Train/Test Split ##
@@ -856,15 +890,14 @@ text(x = .40, y = .6,paste("AUC = ", round(auc.train[[1]],3), sep = ""))
 nloops<-50   #number of CV loops
 ntrains<-dim(train.lda.x)[1]  #No. of samples in training data set
 cv.aucs<-c()
-dat.train.yshuf<-train.lda.y[sample(1:length(train.lda.y))]
 
 set.seed(123)
 for (i in 1:nloops){
   index<-sample(1:ntrains,ntrains*.8)
   cvtrain.x<-train.lda.x[index,]
   cvtest.x<-train.lda.x[-index,]
-  cvtrain.y<-dat.train.yshuf[index]
-  cvtest.y<-dat.train.yshuf[-index]
+  cvtrain.y<-train.lda.y[index]
+  cvtest.y<-train.lda.y[-index]
   
   cvfit <- lda(cvtrain.y ~ ., data = cvtrain.x)
   fit.pred <- predict(cvfit, newdata = cvtest.x)
@@ -881,7 +914,9 @@ for (i in 1:nloops){
 hist(cv.aucs)
 summary(cv.aucs)
 #Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-#0.4763  0.4916  0.4975  0.4974  0.5031  0.5145
+#0.9098  0.9186  0.9211  0.9212  0.9242  0.9342 
+
+#LDA had good results keeping all numeric variables in the data with 50-fold CV
 
 ###################
 ## Random Forest ##
@@ -902,7 +937,7 @@ fitRF <- train(y ~ .,
                method = "ranger", 
                trControl = cv_5,
                num.threads = 4,
-               tuneGrid=rf_grid)  
+               tuneGrid=rf_grid)
 
 fitRF
 plot(fitRF)
@@ -925,3 +960,5 @@ confusionMatrix(predRF, test$y)
 ######################
 ## Model Comparison ##
 ######################
+
+#add ROC curve for our top simple model, complex model, LDA, and RF
