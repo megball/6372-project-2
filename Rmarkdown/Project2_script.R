@@ -750,12 +750,64 @@ Accuracy
 ##############################
 
 # Run Initial Logistic Regression allowing for interaction
-#start with only variables from best simple model
-complex.log<-glm(y~ education * default * month * duration * campaign * poutcome * cons_price_idx * euribor3m * Age_Grp,family="binomial",data=train)
+#computer memory issues - start with only one added interaction
+complex.log<-glm(y~ education + default + month + duration + campaign + poutcome + cons_price_idx + euribor3m + Age_Grp + duration*poutcome,family="binomial",data=train)
 summary(complex.log)
 exp(cbind("Odds ratio" = coef(complex.log), confint.default(complex.log, level = 0.95)))
-vif(complex.log)
+#vif(complex.log)
 
+complex.log<-glm(y~ education + default + month + duration + campaign + poutcome + cons_price_idx + euribor3m + Age_Grp + duration*poutcome + campaign*poutcome,family="binomial",data=train)
+summary(complex.log)
+exp(cbind("Odds ratio" = coef(complex.log), confint.default(complex.log, level = 0.95)))
+#vif(complex.log)
+
+complex.log<-glm(y~ education + default + month + duration + campaign + poutcome + cons_price_idx + euribor3m + Age_Grp + campaign*poutcome,family="binomial",data=train)
+summary(complex.log)
+exp(cbind("Odds ratio" = coef(complex.log), confint.default(complex.log, level = 0.95)))
+#vif(complex.log)
+
+complex.log<-glm(y~ education + default + month + duration + campaign + poutcome + cons_price_idx + euribor3m + Age_Grp + Age_Grp*education,family="binomial",data=train)
+summary(complex.log)
+exp(cbind("Odds ratio" = coef(complex.log), confint.default(complex.log, level = 0.95)))
+#vif(complex.log)
+
+complex.log<-glm(y~ education + default + month + duration + campaign + poutcome + cons_price_idx + euribor3m + Age_Grp + Age_Grp*education + campaign*duration,family="binomial",data=train)
+summary(complex.log)
+exp(cbind("Odds ratio" = coef(complex.log), confint.default(complex.log, level = 0.95)))
+
+complex.log<-glm(y~ education + default + month + duration + campaign + poutcome + cons_price_idx + euribor3m + Age_Grp + Age_Grp*education + campaign*duration + cons_price_idx*euribor3m,family="binomial",data=train)
+summary(complex.log)
+exp(cbind("Odds ratio" = coef(complex.log), confint.default(complex.log, level = 0.95)))
+
+complex.log<-glm(y~ education + default + month + duration + campaign + poutcome + cons_price_idx + euribor3m + Age_Grp + Age_Grp*education + campaign*duration + default*poutcome,family="binomial",data=train)
+summary(complex.log)
+exp(cbind("Odds ratio" = coef(complex.log), confint.default(complex.log, level = 0.95)))
+
+complex.log<-glm(y~ education + default + month + duration + campaign + poutcome + cons_price_idx + euribor3m + Age_Grp + Age_Grp*education + campaign*duration + month*euribor3m,family="binomial",data=train)
+summary(complex.log)
+exp(cbind("Odds ratio" = coef(complex.log), confint.default(complex.log, level = 0.95)))
+
+complex.pred <- predict(complex.log, newdata = test, type="response")
+
+cutoff<-0.5
+class.complex<-factor(ifelse(complex.pred>cutoff,"yes","no"),levels=c("no","yes"))
+
+#Confusion Matrix for Lasso
+conf.complex<-table(class.complex,test$y)
+conf.complex
+
+complex<-confusionMatrix(conf.complex)
+complex
+
+cutoff<-0.15
+class.complex<-factor(ifelse(complex.pred>cutoff,"yes","no"),levels=c("no","yes"))
+
+#Confusion Matrix for Lasso
+conf.complex<-table(class.complex,test$y)
+conf.complex
+
+complex<-confusionMatrix(conf.complex)
+complex
 
 #################
 ## LDA & QDA ###
