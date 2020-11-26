@@ -1,5 +1,5 @@
 #title: "r6 + MB edits"
-#author: "Simerpreet & Megan"
+#author: "Simerpreet & Megan & Rinku"
 #date: "November 20, 2020"
 
 ###################
@@ -887,7 +887,39 @@ summary(cv.aucs)
 ## Random Forest ##
 ###################
 
+cv_5 <- trainControl(method="cv", 
+                     number = 5)
 
+set.seed(1234)
+rf_grid <- expand.grid(
+  mtry = 3:8,
+  splitrule = c("gini","extratrees", "hellinger"),
+  min.node.size = c(1)
+)
+
+fitRF <- train(y ~ ., 
+               data = train, 
+               method = "ranger", 
+               trControl = cv_5,
+               num.threads = 4,
+               tuneGrid=rf_grid)  
+
+fitRF
+plot(fitRF)
+confusionMatrix(fitRF)
+
+predRF <- predict(fitRF, newdata = test)
+confusionMatrix(predRF, test$y)
+
+# I chose to tune 2 hyper parameters for Random Forest
+# - mtry which represents the number of predictors considered when splitting a node in a tree
+# - splitrule which determines the rule used for the actual splitting based on the above predictors
+# I set min.node.size to 1 as appropriate for classification
+
+# Optimizing for accuracy, an mtry of 6 predictors and the Hellinger split rule gave the best test accuracy: 0.9179, with Sensitivity 0.9665 and Specificity 0.5305.
+# It's interesting that Hellinger won. Hellinger handles imbalanced data well; being insensitive to skew.*
+# * CITATION: https://www3.nd.edu/~nchawla/papers/DMKD11.pdf
+# * CITATION: https://medium.com/@evgeni.dubov/classifying-imbalanced-data-using-hellinger-distance-f6a4330d6f9a
 
 
 ######################
