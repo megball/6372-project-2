@@ -103,30 +103,30 @@ str(df$y)
 ################################
 
 #run first pass PCA to see if we have useful numeric predictors
-df.numeric <- df[ , sapply(df, is.numeric)]
+df.numeric2 <- df[ , sapply(df, is.numeric)]
 
-pc.result<-prcomp(df.numeric,scale.=TRUE)
-pc.scores<-pc.result$x
-pc.scores<-data.frame(pc.scores)
-pc.scores$y<-df$y
-pc.scores
+pc.result2<-prcomp(df.numeric2,scale.=TRUE)
+pc.scores2<-pc.result2$x
+pc.scores2<-data.frame(pc.scores2)
+pc.scores2$y<-df$y
+pc.scores2
 
 #Scree plot
-eigenvals<-(pc.result$sdev)^2
-eigenvals
-plot(1:8,eigenvals/sum(eigenvals),type="l",main="Scree Plot PC's",ylab="Prop. Var. Explained",ylim=c(0,1))
-cumulative.prop<-cumsum(eigenvals/sum(eigenvals))
-lines(1:8,cumulative.prop,lty=2)
+eigenvals2<-(pc.result2$sdev)^2
+eigenvals2
+plot(1:10,eigenvals2/sum(eigenvals2),type="l",main="Scree Plot PC's",ylab="Prop. Var. Explained",ylim=c(0,1))
+cumulative.prop2<-cumsum(eigenvals2/sum(eigenvals2))
+lines(1:10,cumulative.prop2,lty=2)
 
 #Use ggplot2 to plot the first few pc's
-ggplot(data = pc.scores, aes(x = PC1, y = PC2)) +
+ggplot(data = pc.scores2, aes(x = PC1, y = PC2)) +
   geom_point(aes(col=y), size=1)+
-  ggtitle("PCA of Numeric Data")
+  ggtitle("PCA of Numeric Data post-EDA")
 #There is some separation, but it is not in a way we would hope for our response variable
 
-ggplot(data = pc.scores, aes(x = PC2, y = PC3)) +
+ggplot(data = pc.scores2, aes(x = PC2, y = PC3)) +
   geom_point(aes(col=y), size=1)+
-  ggtitle("PCA of Numeric Data")
+  ggtitle("PCA of Numeric Data post-EDA")
 
 ggplot(data = pc.scores, aes(x = PC3, y = PC4)) +
   geom_point(aes(col=y), size=1)+
@@ -337,6 +337,40 @@ df_clean <- write.csv(df, "data/df_clean.csv", row.names = FALSE)
 #df <- read.csv(here::here("data", "df_clean.csv"), stringsAsFactors = TRUE)
 #str(df)
 
+###############
+## PCA check ##
+###############
+
+#Re-run PCA after EDA - where we essentially just removed some unknown variables and therefore reduced overall sample size
+df.numeric2 <- df[ , sapply(df, is.numeric)]
+
+pc.result2<-prcomp(df.numeric2,scale.=TRUE)
+pc.scores2<-pc.result2$x
+pc.scores2<-data.frame(pc.scores2)
+pc.scores2$y<-df$y
+pc.scores2
+
+#Scree plot
+eigenvals2<-(pc.result2$sdev)^2
+eigenvals2
+plot(1:10,eigenvals2/sum(eigenvals2),type="l",main="Scree Plot PC's",ylab="Prop. Var. Explained",ylim=c(0,1))
+cumulative.prop2<-cumsum(eigenvals2/sum(eigenvals2))
+lines(1:10,cumulative.prop2,lty=2)
+
+#Use ggplot2 to plot the first few pc's
+ggplot(data = pc.scores2, aes(x = PC1, y = PC2)) +
+  geom_point(aes(col=y), size=1)+
+  ggtitle("PCA of Numeric Data post-EDA")
+#Looks almost exactly the same
+
+ggplot(data = pc.scores2, aes(x = PC2, y = PC3)) +
+  geom_point(aes(col=y), size=1)+
+  ggtitle("PCA of Numeric Data post-EDA")
+
+ggplot(data = pc.scores2, aes(x = PC3, y = PC4)) +
+  geom_point(aes(col=y), size=1)+
+  ggtitle("PCA of Numeric Data post-EDA")
+
 ######################
 ## Train/Test Split ##
 ######################
@@ -412,7 +446,7 @@ summary(simple.log)
 exp(cbind("Odds ratio" = coef(simple.log), confint.default(simple.log, level = 0.95)))
 vif(simple.log)
 #poutcome and prevly_Cntctd have higher vifs but let's keep both of them.
-#MB comment: I think we should take out poutcome at VIF of 24!
+
 
 #Remove statistically insignificant variables and run the model again
 train_simple_3 <- train_simple_2 %>% dplyr::select(-marital,-day_of_week, -loan, -housing,-previous)
@@ -753,12 +787,64 @@ Accuracy
 ##############################
 
 # Run Initial Logistic Regression allowing for interaction
-#start with only variables from best simple model
-complex.log<-glm(y~ education * default * month * duration * campaign * poutcome * cons_price_idx * euribor3m * Age_Grp,family="binomial",data=train)
+#computer memory issues - start with only one added interaction
+complex.log<-glm(y~ education + default + month + duration + campaign + poutcome + cons_price_idx + euribor3m + Age_Grp + duration*poutcome,family="binomial",data=train)
 summary(complex.log)
 exp(cbind("Odds ratio" = coef(complex.log), confint.default(complex.log, level = 0.95)))
-vif(complex.log)
 
+
+complex.log<-glm(y~ education + default + month + duration + campaign + poutcome + cons_price_idx + euribor3m + Age_Grp + duration*poutcome + campaign*poutcome,family="binomial",data=train)
+summary(complex.log)
+exp(cbind("Odds ratio" = coef(complex.log), confint.default(complex.log, level = 0.95)))
+
+
+complex.log<-glm(y~ education + default + month + duration + campaign + poutcome + cons_price_idx + euribor3m + Age_Grp + campaign*poutcome,family="binomial",data=train)
+summary(complex.log)
+exp(cbind("Odds ratio" = coef(complex.log), confint.default(complex.log, level = 0.95)))
+
+
+complex.log<-glm(y~ education + default + month + duration + campaign + poutcome + cons_price_idx + euribor3m + Age_Grp + Age_Grp*education,family="binomial",data=train)
+summary(complex.log)
+exp(cbind("Odds ratio" = coef(complex.log), confint.default(complex.log, level = 0.95)))
+
+
+complex.log<-glm(y~ education + default + month + duration + campaign + poutcome + cons_price_idx + euribor3m + Age_Grp + Age_Grp*education + campaign*duration,family="binomial",data=train)
+summary(complex.log)
+exp(cbind("Odds ratio" = coef(complex.log), confint.default(complex.log, level = 0.95)))
+
+complex.log<-glm(y~ education + default + month + duration + campaign + poutcome + cons_price_idx + euribor3m + Age_Grp + Age_Grp*education + campaign*duration + cons_price_idx*euribor3m,family="binomial",data=train)
+summary(complex.log)
+exp(cbind("Odds ratio" = coef(complex.log), confint.default(complex.log, level = 0.95)))
+
+complex.log<-glm(y~ education + default + month + duration + campaign + poutcome + cons_price_idx + euribor3m + Age_Grp + Age_Grp*education + campaign*duration + default*poutcome,family="binomial",data=train)
+summary(complex.log)
+exp(cbind("Odds ratio" = coef(complex.log), confint.default(complex.log, level = 0.95)))
+
+complex.log<-glm(y~ education + default + month + duration + campaign + poutcome + cons_price_idx + euribor3m + Age_Grp + Age_Grp*education + campaign*duration + month*euribor3m,family="binomial",data=train)
+summary(complex.log)
+exp(cbind("Odds ratio" = coef(complex.log), confint.default(complex.log, level = 0.95)))
+
+complex.pred <- predict(complex.log, newdata = test, type="response")
+
+cutoff<-0.5
+class.complex<-factor(ifelse(complex.pred>cutoff,"yes","no"),levels=c("no","yes"))
+
+#Confusion Matrix
+conf.complex<-table(class.complex,test$y)
+conf.complex
+
+complex<-confusionMatrix(conf.complex)
+complex
+
+cutoff<-0.15
+class.complex<-factor(ifelse(complex.pred>cutoff,"yes","no"),levels=c("no","yes"))
+
+#Confusion Matrix
+conf.complex<-table(class.complex,test$y)
+conf.complex
+
+complex<-confusionMatrix(conf.complex)
+complex
 
 #################
 ## LDA & QDA ###
@@ -779,7 +865,7 @@ pred <- prediction(preds[,2],train.lda.y)
 roc.perf = performance(pred, measure = "tpr", x.measure = "fpr")
 auc.train <- performance(pred, measure = "auc")
 auc.train <- auc.train@y.values
-plot(roc.perf)
+plot(roc.perf, colorize = TRUE)
 abline(a=0, b= 1)
 text(x = .40, y = .6,paste("AUC = ", round(auc.train[[1]],3), sep = ""))
 #AUC = 0.921
@@ -798,7 +884,7 @@ pred1 <- prediction(preds1[,2],test.lda.y)
 roc.perf = performance(pred1, measure = "tpr", x.measure = "fpr")
 auc.train <- performance(pred1, measure = "auc")
 auc.train <- auc.train@y.values
-plot(roc.perf)
+plot(roc.perf, colorize = TRUE)
 abline(a=0, b= 1)
 text(x = .40, y = .6,paste("AUC = ", round(auc.train[[1]],3), sep = ""))
 #AUC = 0.919
@@ -807,15 +893,14 @@ text(x = .40, y = .6,paste("AUC = ", round(auc.train[[1]],3), sep = ""))
 nloops<-50   #number of CV loops
 ntrains<-dim(train.lda.x)[1]  #No. of samples in training data set
 cv.aucs<-c()
-dat.train.yshuf<-train.lda.y[sample(1:length(train.lda.y))]
 
 set.seed(123)
 for (i in 1:nloops){
   index<-sample(1:ntrains,ntrains*.8)
   cvtrain.x<-train.lda.x[index,]
   cvtest.x<-train.lda.x[-index,]
-  cvtrain.y<-dat.train.yshuf[index]
-  cvtest.y<-dat.train.yshuf[-index]
+  cvtrain.y<-train.lda.y[index]
+  cvtest.y<-train.lda.y[-index]
   
   cvfit <- lda(cvtrain.y ~ ., data = cvtrain.x)
   fit.pred <- predict(cvfit, newdata = cvtest.x)
@@ -832,7 +917,219 @@ for (i in 1:nloops){
 hist(cv.aucs)
 summary(cv.aucs)
 #Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-#0.4763  0.4916  0.4975  0.4974  0.5031  0.5145
+#0.9098  0.9186  0.9211  0.9212  0.9242  0.9342 
+
+#LDA had good results keeping all numeric variables in the data with 50-fold CV
+
+#test using just the numeric ones from our best step model
+fit.lda_step <- lda(train.lda.y ~ duration + campaign + cons_price_idx + euribor3m, data = train.lda.x)
+pred.lda_step <- predict(fit.lda_step, newdata = train.lda.x)
+
+preds_step <- pred.lda_step$posterior
+preds_step <- as.data.frame(preds_step)
+
+pred_step <- prediction(preds_step[,2],train.lda.y)
+roc.perf_step = performance(pred_step, measure = "tpr", x.measure = "fpr")
+auc.train_step <- performance(pred_step, measure = "auc")
+auc.train_step <- auc.train_step@y.values
+plot(roc.perf_step, colorize = TRUE)
+abline(a=0, b= 1)
+text(x = .40, y = .6,paste("AUC = ", round(auc.train_step[[1]],3), sep = ""))
+#AUC = 0.907
+
+#running cv on train set using LDA with subset of numeric vars
+nloops<-50   #number of CV loops
+ntrains<-dim(train.lda.x)[1]  #No. of samples in training data set
+cv.aucs_2<-c()
+
+set.seed(123)
+for (i in 1:nloops){
+  index<-sample(1:ntrains,ntrains*.8)
+  cvtrain.x<-train.lda.x[index,]
+  cvtest.x<-train.lda.x[-index,]
+  cvtrain.y<-train.lda.y[index]
+  cvtest.y<-train.lda.y[-index]
+  
+  cvfit_2 <- lda(cvtrain.y ~ duration + campaign + cons_price_idx + euribor3m, data = cvtrain.x)
+  fit.pred_2 <- predict(cvfit_2, newdata = cvtest.x)
+  preds.cv_2 <- fit.pred_2$posterior
+  preds.cv_2 <- as.data.frame(preds.cv_2)
+  pred.cv_2 <- prediction(preds.cv_2[,2], cvtest.y)
+  roc.perf_2 = performance(pred.cv_2, measure = "tpr", x.measure = "fpr")
+  auc.train_2 <- performance(pred.cv_2, measure = "auc")
+  auc.train_2 <- auc.train_2@y.values
+  
+  cv.aucs_2[i]<-auc.train_2[[1]]
+}
+
+hist(cv.aucs_2)
+summary(cv.aucs_2)
+#Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+#0.8962  0.9029  0.9068  0.9065  0.9088  0.9174 
+
+#The subset using the numeric vars from our step logistic model has very similar performance
+
+#run on test set
+# Test Set
+pred.lda1_step <- predict(fit.lda_step, newdata = test.lda.x)
+
+preds1_step <- pred.lda1_step$posterior
+preds1_step <- as.data.frame(preds1_step)
+
+pred1_step <- prediction(preds1_step[,2],test.lda.y)
+roc.perf_step2 = performance(pred1_step, measure = "tpr", x.measure = "fpr")
+auc.train_step2 <- performance(pred1_step, measure = "auc")
+auc.train_step2 <- auc.train_step2@y.values
+plot(roc.perf_step2, colorize = TRUE)
+abline(a=0, b= 1)
+text(x = .40, y = .6,paste("AUC = ", round(auc.train_step2[[1]],3), sep = ""))
+#AUC = 0.905
+
+####Running QDA
+
+#running cv on train set using QDA with subset of numeric vars
+nloops<-50   #number of CV loops
+ntrains<-dim(train.lda.x)[1]  #No. of samples in training data set
+cv.aucs_qda<-c()
+
+set.seed(123)
+for (i in 1:nloops){
+  index<-sample(1:ntrains,ntrains*.8)
+  cvtrain.x<-train.lda.x[index,]
+  cvtest.x<-train.lda.x[-index,]
+  cvtrain.y<-train.lda.y[index]
+  cvtest.y<-train.lda.y[-index]
+  
+  cvfit_qda <- qda(cvtrain.y ~ duration + campaign + cons_price_idx + euribor3m, data = cvtrain.x)
+  fit.pred_qda <- predict(cvfit_qda, newdata = cvtest.x)
+  preds.cv_qda <- fit.pred_qda$posterior
+  preds.cv_qda <- as.data.frame(preds.cv_qda)
+  pred.cv_qda <- prediction(preds.cv_qda[,2], cvtest.y)
+  roc.perf_qda = performance(pred.cv_qda, measure = "tpr", x.measure = "fpr")
+  auc.train_qda <- performance(pred.cv_qda, measure = "auc")
+  auc.train_qda <- auc.train_qda@y.values
+  
+  cv.aucs_qda[i]<-auc.train_qda[[1]]
+}
+
+hist(cv.aucs_qda)
+summary(cv.aucs_qda)
+#Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+#0.8860  0.8919  0.8959  0.8963  0.9005  0.9091 
+
+
+#QDA on train set
+fit.qda <- qda(train.lda.y ~ duration + campaign + cons_price_idx + euribor3m, data = train.lda.x)
+pred.qda <- predict(fit.qda, newdata = train.lda.x)
+
+preds_qda <- pred.qda$posterior
+preds_qda <- as.data.frame(preds_qda)
+
+pred_qda <- prediction(preds_qda[,2],train.lda.y)
+roc.perf_qda = performance(pred_qda, measure = "tpr", x.measure = "fpr")
+auc.train_qda <- performance(pred_qda, measure = "auc")
+auc.train_qda <- auc.train_qda@y.values
+plot(roc.perf_qda, colorize = TRUE)
+abline(a=0, b= 1)
+text(x = .40, y = .6,paste("AUC = ", round(auc.train_qda[[1]],3), sep = ""))
+#AUC = 0.896
+
+# Test Set
+pred.qda1 <- predict(fit.qda, newdata = test.lda.x)
+
+preds1_qda <- pred.qda1$posterior
+preds1_qda <- as.data.frame(preds1_qda)
+
+pred1_qda <- prediction(preds1_qda[,2],test.lda.y)
+roc.perf_qda1 = performance(pred1_qda, measure = "tpr", x.measure = "fpr")
+auc.train_qda1 <- performance(pred1_qda, measure = "auc")
+auc.train_qda1 <- auc.train_qda1@y.values
+plot(roc.perf_qda1)
+abline(a=0, b= 1)
+text(x = .40, y = .6,paste("AUC = ", round(auc.train_qda1[[1]],3), sep = ""))
+#AUC = 0.895
+
+#Run randomly shuffled y -vars because the models are performing very similarly
+nloops<-50   #number of CV loops
+ntrains<-dim(train.lda.x)[1]  #No. of samples in training data set
+cv.aucs_shuf<-c()
+dat.train.yshuf<-train.lda.y[sample(1:length(train.lda.y))]
+
+set.seed(123)
+for (i in 1:nloops){
+  index<-sample(1:ntrains,ntrains*.8)
+  cvtrain.x<-train.lda.x[index,]
+  cvtest.x<-train.lda.x[-index,]
+  cvtrain.yshuf<-dat.train.yshuf[index]
+  cvtest.yshuf<-dat.train.yshuf[-index]
+  
+  cvfit_shuf <- lda(cvtrain.yshuf ~ duration + campaign + cons_price_idx + euribor3m, data = cvtrain.x)
+  fit.pred_shuf <- predict(cvfit_shuf, newdata = cvtest.x)
+  preds.cv_shuf <- fit.pred_shuf$posterior
+  preds.cv_shuf <- as.data.frame(preds.cv_shuf)
+  pred.cv_shuf <- prediction(preds.cv_shuf[,2], cvtest.yshuf)
+  roc.perf_shuf = performance(pred.cv_shuf, measure = "tpr", x.measure = "fpr")
+  auc.train_shuf <- performance(pred.cv_shuf, measure = "auc")
+  auc.train_shuf <- auc.train_shuf@y.values
+  
+  cv.aucs_shuf[i]<-auc.train_shuf[[1]]
+}
+
+hist(cv.aucs_shuf)
+summary(cv.aucs_shuf)
+#Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+#0.4940  0.5034  0.5102  0.5098  0.5172  0.5347 
+
+#the AUC degrades to ~0.5 so we seem to be doing something right.
+
+#Generate confusion matrix and accuracy/sens/spec for best LDA model with matching vars to logistic model
+
+#from our ROC curve, the best cut-off looks to be between 0.1 and 0.2
+cutoff<-0.15
+class.lda_all<-factor(ifelse(preds1[2]>cutoff,"yes","no"),levels=c("no","yes"))
+class.lda_step<-factor(ifelse(preds1_step[2]>cutoff,"yes","no"),levels=c("no","yes"))
+class.qda_step<-factor(ifelse(preds1_qda[2]>cutoff,"yes","no"),levels=c("no","yes"))
+
+#confusion matrices
+
+#Confusion Matrix for LDA with all vars
+conf.lda_all<-table(class.lda_all,test.lda.y)
+print("Confusion matrix for LDA with all Vars")
+conf.lda_all
+
+#Confusion Matrix for LDA with stepwise vars
+conf.lda_step<-table(class.lda_step,test.lda.y)
+print("Confusion matrix for LDA with some Vars")
+conf.lda_step
+
+#Confusion Matrix for QDA with stepwise vars
+conf.qda_step<-table(class.qda_step,test.lda.y)
+print("Confusion matrix for QDA with some Vars")
+conf.qda_step
+
+#Accuracy of LASSO and Stepwise
+print("Overall accuracy for LDA w/ all vars, LDA w/ some vars, and QDA respectively")
+sum(diag(conf.lda_all))/sum(conf.lda_all)
+sum(diag(conf.lda_all))/sum(conf.lda_all)
+sum(diag(conf.qda_step))/sum(conf.qda_step)
+
+#Confusion Matrix for cut off =0.15
+lda_all_0.15<-confusionMatrix(conf.lda_all)
+lda_step_0.15<-confusionMatrix(conf.lda_step)
+qda_0.15<-confusionMatrix(conf.qda_step)
+
+lda_all_0.15
+lda_step_0.15
+qda_0.15
+
+Sensitivity_LDA <- data.frame("Model" = c("LDA All", "LDA Stepwise", "QDA Stepwise"), "Sensitivity" =c(lda_all_0.15$byClass[1],lda_step_0.15$byClass[1],qda_0.15$byClass[1]))
+
+Specificity_LDA<- data.frame("Specificity"=c(lda_all_0.15$byClass[2],lda_step_0.15$byClass[2],qda_0.15$byClass[2] ) )
+
+Accuracy_LDA<- data.frame("Accuracy"=c(lda_all_0.15$overall[1],lda_step_0.15$overall[1],qda_0.15$overall[1]) )
+
+Overall <- cbind(Sensitivity_LDA,Specificity_LDA,Accuracy_LDA)
+Overall
 
 ###################
 ## Random Forest ##
@@ -843,3 +1140,14 @@ summary(cv.aucs)
 ######################
 ## Model Comparison ##
 ######################
+
+graphics.off()
+
+#add ROC curve for our top simple model, complex model, LDA, and RF
+
+plot(roc.step,col="orange")
+#add complex model ROC curve
+plot(roc.perf_step2, col="red", add = TRUE)
+#add random forest ROC curve
+legend("bottomright",legend=c("Stepwise Logistic Regression","LDA"),col=c("orange","red"),lty=1,lwd=1)
+abline(a=0, b= 1)
