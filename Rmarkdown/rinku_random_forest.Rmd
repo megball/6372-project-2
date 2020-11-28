@@ -5,6 +5,12 @@ date: "11/27/2020"
 output: html_document
 ---
 
+```{r}
+library(pacman)
+p_load("caret", "dplyr", "pROC")
+```
+
+
 # Load the data
 
 ```{r}
@@ -75,14 +81,15 @@ observed.classes <- test$y
 res.roc <- roc(observed.classes, prediction.probabilities)
 plot.roc(res.roc, print.auc = TRUE, print.thres = "best")
 
-# If we wanted cutoffs for specific specificities...
+# If we wanted cutoffs for specific specificities we specifically specify, we could do THIS:
 #roc.data <- data_frame(
 #  thresholds = res.roc$thresholds,
 #  sensitivity = res.roc$sensitivities,
 #  specificity = res.roc$specificities
 #)
-# Get the probability threshold for specificity = 0.6
+# Then we can get the cutoff for specificity = <something> like this
 #roc.data %>% filter(specificity >= 0.6)
+#...or similar
 
 ```
 The most balanced cutoff for this model is 0.117, which gives 
