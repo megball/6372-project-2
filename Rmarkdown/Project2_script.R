@@ -376,6 +376,9 @@ nrow(test %>% filter(y=='yes'))  #852
 summary(train)
 #30595 obs. of 24 variables
 
+write.csv(train, "data/train.csv", row.names = FALSE)
+write.csv(test, "data/test.csv", row.names = FALSE)
+
 
 ##############################
 ### Simple Logistic Model ###
