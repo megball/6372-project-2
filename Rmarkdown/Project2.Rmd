@@ -1315,13 +1315,13 @@ predicted.classes <- fitRF.predictions.raw
 observed.classes <- test$y
 
 # Compute roc
-res.roc <- roc(observed.classes, prediction.probabilities)
-plot.roc(res.roc, print.auc = TRUE, print.thres = "best")
+roc.randomforest <- roc(observed.classes, prediction.probabilities)
+plot.roc(roc.randomforest, print.auc = TRUE, print.thres = "best", col="purple")
 ```
 
 ```{r}
 # Get the best cutoff for balancing Sensitivity and Specificity
-cutoff <- coords(res.roc, "best", ret="threshold", transpose = FALSE)$threshold
+cutoff <- coords(roc.randomforest, "best", ret="threshold", transpose = FALSE)$threshold
 
 # Predict using the best cutoff and confirm with a Confusion Matrix
 predicted.classes.balanced <- factor(
@@ -1340,8 +1340,8 @@ graphics.off()
 plot(roc.step,col="orange")
 plot(roc.complex,col = "blue", add = TRUE)
 plot(roc.perf_step2, col="red", add = TRUE)
-#add random forest ROC curve
-legend("bottomright",legend=c("Stepwise Logistic Regression","Complex Model", "LDA"),col=c("orange","blue","red"),lty=1,lwd=1)
+plot(roc.randomforest, col="purple", add = TRUE)
+legend("bottomright",legend=c("Stepwise Logistic Regression","Complex Model", "LDA", "Random Forest"),col=c("orange","blue","red","purple"),lty=1,lwd=1)
 abline(a=0, b= 1)
 ```
 
