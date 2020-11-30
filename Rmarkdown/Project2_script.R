@@ -269,6 +269,17 @@ df3 <- df %>%  group_by(duration_group) %>%  count(y) %>%  mutate(duration_group
 
 #Looking above, clearly conversion rate goes up the longer the most recent call
 
+#Visualizing for interactions
+prop.table(table(df$prevly_Cntctd,df$duration_group),2)
+plot(prevly_Cntctd~duration_group,data=df,col=c("purple","green"))
+
+prop.table(table(df$prevly_Cntctd,df$y),2)
+plot(prevly_Cntctd~y,data=df,col=c("purple","green"))
+
+prop.table(table(df$education,df$marital),2)
+plot(education~marital,data=df,col=c("purple","green","blue","yellow","orange","red","black"))
+
+
 # Checking for correlation
 
 # Convert data to numeric
@@ -370,6 +381,8 @@ ggplot(data = pc.scores2, aes(x = PC2, y = PC3)) +
 ggplot(data = pc.scores2, aes(x = PC3, y = PC4)) +
   geom_point(aes(col=y), size=1)+
   ggtitle("PCA of Numeric Data post-EDA")
+
+
 
 ######################
 ## Train/Test Split ##
