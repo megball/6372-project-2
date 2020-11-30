@@ -269,7 +269,7 @@ df3 <- df %>%  group_by(duration_group) %>%  count(y) %>%  mutate(duration_group
 
 #Looking above, clearly conversion rate goes up the longer the most recent call
 
-#Visualizing for interactions
+#Visualizing categorical variables
 prop.table(table(df$prevly_Cntctd,df$duration_group),2)
 plot(prevly_Cntctd~duration_group,data=df,col=c("purple","green"))
 
