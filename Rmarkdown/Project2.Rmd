@@ -27,6 +27,7 @@ library(car)
 library(ROCR)
 library(MASS)
 library(glmnet)
+library(pROC)
 ```
 
 # Load Data
@@ -1247,8 +1248,87 @@ Overall
 
 # Random Forest 
 
+```{r}
+library(pacman)
+```
 
-# MOVED TO: rinku_random_forest.Rmd
+## Train a Random Forest, tuning mtry and splitrule
+
+```{r}
+set.seed(1234)
+cv_control <- trainControl(method="cv", 
+                     classProbs = TRUE,
+                     savePredictions = TRUE,
+                     summaryFunction = twoClassSummary,
+                     num = 5)
+rf_grid <- expand.grid(
+  mtry = 4:8,
+  splitrule = c("gini","extratrees", "hellinger"),
+  min.node.size = c(1)
+)
+fitRF <- train(y ~ ., 
+               data = train, 
+               method = "ranger", 
+               metric = "ROC",
+               trControl = cv_control,
+               num.threads = 6,
+               num.trees = 30,
+               tuneGrid=rf_grid)  
+fitRF
+```
+
+I chose to tune 2 hyper parameters for Random Forest
+1. mtry which represents the number of predictors considered when splitting a node in a tree
+2. splitrule which determines the rule used for the actual splitting based on the above predictors
+Note: I set min.node.size to 1 as appropriate for classification
+
+# Performance on Training Set
+
+```{r}
+plot(fitRF)
+confusionMatrix(fitRF)
+```
+
+Optimizing for ROC, the winning parameters are an mtry of 5 predictors considered at each split, and the Hellinger split rule.  It's interesting that Hellinger won. I found some papers suggesting Hellinger handles imbalanced data well; being insensitive to skew.*
+* CITATION: https://www3.nd.edu/~nchawla/papers/DMKD11.pdf
+* CITATION: https://medium.com/@evgeni.dubov/classifying-imbalanced-data-using-hellinger-distance-f6a4330d6f9a
+
+# Performance on Test Set
+
+```{r}
+fitRF.predictions.raw <- predict(fitRF, newdata = test, type="raw")
+fitRF.predictions.prob <- predict(fitRF, newdata = test, type="prob")
+confusionMatrix(fitRF.predictions.raw, test$y, positive="yes")
+```
+
+Using the default cutoff, our random forest gets a test accuracy of 0.9161, with Sensitivity 0.4953 and Specificity 0.9688.
+
+# ROC Curve and Optimal Cutoff
+
+```{r warning=F, message=F}
+prediction.probabilities <- fitRF.predictions.prob$yes
+predicted.classes <- fitRF.predictions.raw
+observed.classes <- test$y
+# Compute roc
+res.roc <- roc(observed.classes, prediction.probabilities)
+plot.roc(res.roc, print.auc = TRUE, print.thres = "best")
+# If we wanted cutoffs for specific specificities we specifically specify, we could do THIS:
+#roc.data <- data_frame(
+#  thresholds = res.roc$thresholds,
+#  sensitivity = res.roc$sensitivities,
+#  specificity = res.roc$specificities
+#)
+# Then we can get the cutoff for specificity = <something> like this
+#roc.data %>% filter(specificity >= 0.6)
+#...or similar
+
+#ROCR - trying to get in same format for overlay below
+#results.rf<-prediction(fitRF.predictions.raw, test$y,label.ordering=c("no","yes"))
+#roc.complex = performance(results.complex, measure = "tpr", x.measure = "fpr")
+#plot(roc.complex,colorize = TRUE)
+#abline(a=0, b= 1)
+```
+The most balanced cutoff for this model is 0.117, which gives 
 
 
 # Model Comparison 
@@ -1260,8 +1340,8 @@ graphics.off()
 plot(roc.step,col="orange")
 plot(roc.complex,col = "blue", add = TRUE)
 plot(roc.perf_step2, col="red", add = TRUE)
-#add random forest ROC curve
-legend("bottomright",legend=c("Stepwise Logistic Regression","Complex Model", "LDA"),col=c("orange","blue","red"),lty=1,lwd=1)
+#plot(res.roc, col = "green", add = TRUE)
+legend("bottomright",legend=c("Stepwise Logistic Regression","Complex Model", "LDA", "Random Forest"),col=c("orange","blue","red"),lty=1,lwd=1)
 abline(a=0, b= 1)
 ```
 
