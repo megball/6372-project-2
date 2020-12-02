@@ -589,7 +589,7 @@ confusionMatrix(class.step1,test$y)
 
 ```{r}
 dat.train.x <- model.matrix(y~.,train)
-dat.train.y<-train[,24]
+dat.train.y<-as.matrix(train[,24])
 cvfit <- cv.glmnet(dat.train.x, dat.train.y, family = "binomial", type.measure = "class", nlambda = 1000)
 plot(cvfit)
 coef(cvfit, s = "lambda.min")
