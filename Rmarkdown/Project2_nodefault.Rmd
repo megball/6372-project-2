@@ -239,9 +239,11 @@ Ideally, the campaign would stop contacting people who are less likely to subscr
 
 ### Analyzing job
 ```{r}
-ggplot(df) +   geom_bar(mapping = aes(x = job, fill = y)) +   coord_flip() +     #Added coord flip here to make it more readable
-  ggtitle("Number of 'y' by job") +  ylab("Count") +   x
-lab("Job")
+ggplot(df) +   
+  geom_bar(mapping = aes(x = job, fill = y)) +   
+  coord_flip() +     #Added coord flip here to make it more readable
+  ggtitle("Number of 'y' by job") +  ylab("Count") +   
+  xlab("Job")
 ```
 
 "y" - has a client subscribed a term deposit? : admin, technician and blue collar jobs are the top 3 subscribers by volume 
@@ -354,7 +356,7 @@ varImp(RFresults)
 
 ```{r}
 #save dataset to this point
-#df_nodefault <- write.csv(df, "data/df_nodefault.csv", row.names = FALSE)
+#df_nodefault <- write.csv(df, "df_nodefault.csv", row.names = FALSE)
 
 #open saved dataframe
 #df <- read.csv(here::here("data", "df_clean.csv"), stringsAsFactors = TRUE)
@@ -399,7 +401,7 @@ ggplot(data = pc.scores2, aes(x = PC3, y = PC4)) +
 
 ```{r}
 summary(df)
-#38245 obs. of 24 variables
+#38227 obs. of 23 variables
 
 set.seed(1234) 
 
@@ -432,8 +434,8 @@ nrow(test %>% filter(y=='yes'))  #851
 summary(train)
 #30581 obs. of 23 variables
 
-#write.csv(train, "data/train.csv", row.names = FALSE)
-#write.csv(test, "data/test.csv", row.names = FALSE)
+#train_nodefault <- write.csv(train, "train_nodefault.csv", row.names = FALSE)
+#test_nodefault <- write.csv(test, "test_nodefault.csv", row.names = FALSE)
 ```
 
 
@@ -594,47 +596,49 @@ confusionMatrix(class.step1,test$y)
 
 ## Feature selection using lasso
 
+MB: kept getting same error as Rinku and couldn't run this part :(
+
 ```{r}
-dat.train.x <- model.matrix(y~.,train)
-dat.train.x <- as.matrix(dat.train.x)
-dat.train.y<-train[,23]
-cvfit <- cv.glmnet(dat.train.x, dat.train.y, family = "binomial", type.measure = "class", nlambda = 1000)
-plot(cvfit)
-coef(cvfit, s = "lambda.min")
-#CV misclassification error rate is little below .1
-print("CV Error Rate:")
-cvfit$cvm[which(cvfit$lambda==cvfit$lambda.min)]
-#"CV Error Rate:"
-#0.09053767
+#dat.train.x <- model.matrix(y~.,train)
+#dat.train.x <- as.matrix(dat.train.x)
+#dat.train.y<-train[,23]
+#cvfit <- cv.glmnet(dat.train.x, dat.train.y, family = "binomial", type.measure = "class", nlambda = 1000)
+#plot(cvfit)
+#coef(cvfit, s = "lambda.min")
+##CV misclassification error rate is little below .1
+#print("CV Error Rate:")
+#cvfit$cvm[which(cvfit$lambda==cvfit$lambda.min)]
+##"CV Error Rate:"
+##0.09053767
 
 #Optimal penalty
-print("Penalty Value:")
-cvfit$lambda.min
-#"Penalty Value:"
-#0.001054887
-finalmodel<-glmnet(dat.train.x, dat.train.y, family = "binomial",lambda=cvfit$lambda.min)
-finalmodel$call
-finalmodel
+#print("Penalty Value:")
+#cvfit$lambda.min
+##"Penalty Value:"
+##0.001054887
+#finalmodel<-glmnet(dat.train.x, dat.train.y, family = "binomial",lambda=cvfit$lambda.min)
+#finalmodel$call
+#finalmodel
 
-dat.test.x<-model.matrix(y~.,test)
-fit.pred.lasso <- predict(finalmodel, newx = dat.test.x, type = "response")
+#dat.test.x<-model.matrix(y~.,test)
+#fit.pred.lasso <- predict(finalmodel, newx = dat.test.x, type = "response")
 
-test$y[1:15]
-fit.pred.lasso[1:15]
+#test$y[1:15]
+#fit.pred.lasso[1:15]
 ```
 
 ```{r}
 #confusion matrix at 0.5 cutoff
-class.lasso1<-factor(ifelse(fit.pred.lasso>0.5,"yes","no"),levels=c("no","yes"))
+#class.lasso1<-factor(ifelse(fit.pred.lasso>0.5,"yes","no"),levels=c("no","yes"))
 # use caret and compute a confusion matrix
-confusionMatrix(class.lasso1,test$y)
+#confusionMatrix(class.lasso1,test$y)
 #Acc 91%, Sens. 97%, Spec. 45%
 
 #ROCR
-results.lasso<-prediction(fit.pred.lasso, test$y,label.ordering=c("no","yes"))
-roc.lasso = performance(results.lasso, measure = "tpr", x.measure = "fpr")
-plot(roc.lasso,colorize = TRUE)
-abline(a=0, b= 1)
+#results.lasso<-prediction(fit.pred.lasso, test$y,label.ordering=c("no","yes"))
+#roc.lasso = performance(results.lasso, measure = "tpr", x.measure = "fpr")
+#plot(roc.lasso,colorize = TRUE)
+#abline(a=0, b= 1)
 
 
 results.step<-prediction(fit.pred.step, test$y,label.ordering=c("no","yes"))
@@ -646,8 +650,8 @@ fit.pred.origin<-predict(simple.log,newdata=test,type="response")
 results.origin<-prediction(fit.pred.origin,test$y,label.ordering=c("no","yes"))
 roc.origin=performance(results.origin,measure = "tpr", x.measure = "fpr")
 
-plot(roc.lasso)
-plot(roc.step,col="orange", add = TRUE)
+#plot(roc.lasso)
+plot(roc.step,col="orange")
 plot(roc.origin,col="blue",add=TRUE)
 legend("bottomright",legend=c("Lasso","Stepwise","Simple"),col=c("black","orange","blue"),lty=1,lwd=1)
 abline(a=0, b= 1)
@@ -656,14 +660,14 @@ abline(a=0, b= 1)
 ```{r}
 #Playing with different cut offs
 cutoff<-0.5
-class.lasso<-factor(ifelse(fit.pred.lasso>cutoff,"yes","no"),levels=c("no","yes"))
+#class.lasso<-factor(ifelse(fit.pred.lasso>cutoff,"yes","no"),levels=c("no","yes"))
 class.step<-factor(ifelse(fit.pred.step>cutoff,"yes","no"),levels=c("no","yes"))
 class.simple<-factor(ifelse(fit.pred.simple>cutoff,"yes","no"),levels=c("no","yes"))
 
 #Confusion Matrix for Lasso
-conf.lasso<-table(class.lasso,test$y)
-print("Confusion matrix for LASSO")
-conf.lasso
+#conf.lasso<-table(class.lasso,test$y)
+#print("Confusion matrix for LASSO")
+#conf.lasso
 
 #Confusion Matrix for step
 conf.step<-table(class.step,test$y)
@@ -676,30 +680,30 @@ print("Confusion matrix for Stepwise")
 conf.simple
 
 #Accuracy of LASSO and Stepwise
-print("Overall accuracy for LASSO and Stepwise respectively")
-sum(diag(conf.lasso))/sum(conf.lasso)
+#print("Overall accuracy for LASSO and Stepwise respectively")
+#sum(diag(conf.lasso))/sum(conf.lasso)
 sum(diag(conf.step))/sum(conf.step)
 print("Alternative calculations of accuracy")
-Acc_LASSO_0.5 <- mean(class.lasso==test$y)
+#Acc_LASSO_0.5 <- mean(class.lasso==test$y)
 Acc_STEP_0.5 <-mean(class.step==test$y)
 Acc_SIMPLE_0.5<-mean(class.simple==test$y)
 
 #Confusion Matrix for cut off =05
-lasso_0.5<-confusionMatrix(conf.lasso)
+#lasso_0.5<-confusionMatrix(conf.lasso)
 step_0.5<-confusionMatrix(conf.step)
 simple_0.5<-confusionMatrix(conf.simple)
 
 cutoff<-0.1
-class.lasso<-factor(ifelse(fit.pred.lasso>cutoff,"yes","no"),levels=c("no","yes"))
+#class.lasso<-factor(ifelse(fit.pred.lasso>cutoff,"yes","no"),levels=c("no","yes"))
 class.step<-factor(ifelse(fit.pred.step>cutoff,"yes","no"),levels=c("no","yes"))
 class.simple<-factor(ifelse(fit.pred.simple>cutoff,"yes","no"),levels=c("no","yes"))
 ```
 
 ## Confusion Matrix for Lasso
 ```{r}
-conf.lasso<-table(class.lasso,test$y)
-print("Confusion matrix for LASSO")
-conf.lasso
+#conf.lasso<-table(class.lasso,test$y)
+#print("Confusion matrix for LASSO")
+#conf.lasso
 ```
 
 ## Confusion Matrix for step
@@ -712,14 +716,14 @@ conf.step
 ## Confusion Matrix for simple
 ```{r}
 conf.simple<-table(class.simple,test$y)
-print("Confusion matrix for Stepwise")
+print("Confusion matrix for Simple")
 conf.simple
 ```
 
 ## Accuracy of LASSO and Stepwise
 ```{r}
-print("Overall accuracy for LASSO and Stepwise respectively")
-sum(diag(conf.lasso))/sum(conf.lasso)
+#print("Overall accuracy for LASSO and Stepwise respectively")
+#sum(diag(conf.lasso))/sum(conf.lasso)
 sum(diag(conf.step))/sum(conf.step)
 #print("Alternative calculations of accuracy")
 #Acc_LASSO_0.1 <- mean(class.lasso==test$y)
@@ -729,23 +733,23 @@ sum(diag(conf.step))/sum(conf.step)
 
 Confusion Matrix for cut off =0.1
 ```{r}
-lasso_0.1<-confusionMatrix(conf.lasso)
+#lasso_0.1<-confusionMatrix(conf.lasso)
 step_0.1<-confusionMatrix(conf.step)
 simple_0.1<-confusionMatrix(conf.simple)
 ```
 
 ```{r}
 cutoff<-0.15
-class.lasso<-factor(ifelse(fit.pred.lasso>cutoff,"yes","no"),levels=c("no","yes"))
+#class.lasso<-factor(ifelse(fit.pred.lasso>cutoff,"yes","no"),levels=c("no","yes"))
 class.step<-factor(ifelse(fit.pred.step>cutoff,"yes","no"),levels=c("no","yes"))
 class.simple<-factor(ifelse(fit.pred.simple>cutoff,"yes","no"),levels=c("no","yes"))
 ```
 
 Confusion Matrix for Lasso at 0.15 cut-off
 ```{r}
-conf.lasso<-table(class.lasso,test$y)
-print("Confusion matrix for LASSO")
-conf.lasso
+#conf.lasso<-table(class.lasso,test$y)
+#print("Confusion matrix for LASSO")
+#conf.lasso
 ```
 
 Confusion Matrix for step at 0.15 cut-off
@@ -764,19 +768,19 @@ conf.simple
 
 ## Accuracy of LASSO and Stepwise
 ```{r}
-print("Overall accuracy for LASSO and Stepwise respectively")
-sum(diag(conf.lasso))/sum(conf.lasso)
+#print("Overall accuracy for LASSO and Stepwise respectively")
+#sum(diag(conf.lasso))/sum(conf.lasso)
 sum(diag(conf.step))/sum(conf.step)
 #print("Alternative calculations of accuracy")
 #Acc_LASSO_0.15 <- mean(class.lasso==test$y)
-#Acc_STEP_0.15 <-mean(class.step==test$y)
-#Acc_SIMPLE_0.15<-mean(class.simple==test$y)
+Acc_STEP_0.15 <-mean(class.step==test$y)
+Acc_SIMPLE_0.15<-mean(class.simple==test$y)
 ```
 
 
 Confusion Matrix for cut off =0.15
 ```{r}
-lasso_0.15<-confusionMatrix(conf.lasso)
+#lasso_0.15<-confusionMatrix(conf.lasso)
 step_0.15<-confusionMatrix(conf.step)
 simple_0.15<-confusionMatrix(conf.simple)
 ```
@@ -784,14 +788,14 @@ simple_0.15<-confusionMatrix(conf.simple)
 Checking 0.2 cut off
 ```{r}
 cutoff<-0.2
-class.lasso<-factor(ifelse(fit.pred.lasso>cutoff,"yes","no"),levels=c("no","yes"))
+#class.lasso<-factor(ifelse(fit.pred.lasso>cutoff,"yes","no"),levels=c("no","yes"))
 class.step<-factor(ifelse(fit.pred.step>cutoff,"yes","no"),levels=c("no","yes"))
 class.simple<-factor(ifelse(fit.pred.simple>cutoff,"yes","no"),levels=c("no","yes"))
 
 #Confusion Matrix for Lasso
-conf.lasso<-table(class.lasso,test$y)
-print("Confusion matrix for LASSO")
-conf.lasso
+#conf.lasso<-table(class.lasso,test$y)
+#print("Confusion matrix for LASSO")
+#conf.lasso
 
 #Confusion Matrix for step
 conf.step<-table(class.step,test$y)
@@ -800,20 +804,20 @@ conf.step
 
 #Confusion Matrix for simple
 conf.simple<-table(class.simple,test$y)
-print("Confusion matrix for Stepwise")
+print("Confusion matrix for Simple")
 conf.simple
 
 #Accuracy of LASSO and Stepwise
-print("Overall accuracy for LASSO and Stepwise respectively")
-sum(diag(conf.lasso))/sum(conf.lasso)
+#print("Overall accuracy for LASSO and Stepwise respectively")
+#sum(diag(conf.lasso))/sum(conf.lasso)
 sum(diag(conf.step))/sum(conf.step)
 #print("Alternative calculations of accuracy")
 #Acc_LASSO_0.2 <- mean(class.lasso==test$y)
-#Acc_STEP_0.2 <-mean(class.step==test$y)
-#Acc_SIMPLE_0.2<-mean(class.simple==test$y)
+Acc_STEP_0.2 <-mean(class.step==test$y)
+Acc_SIMPLE_0.2<-mean(class.simple==test$y)
 
 #Confusion Matrix for cut off =0.2
-lasso_0.2<-confusionMatrix(conf.lasso)
+#lasso_0.2<-confusionMatrix(conf.lasso)
 step_0.2<-confusionMatrix(conf.step)
 simple_0.2<-confusionMatrix(conf.simple)
 ```
@@ -821,19 +825,19 @@ simple_0.2<-confusionMatrix(conf.simple)
 ```{r}
 Sensitivity_simple<- data.frame("CutOff"= c("0.1", "0.15","0.2","0.5"),"Simple_Sensitivty"=c(simple_0.1$byClass[1],simple_0.15$byClass[1],simple_0.2$byClass[1],simple_0.5$byClass[1] ) )
 Sensitivity_step<- data.frame("CutOff"= c("0.1", "0.15","0.2","0.5"),"Step_Sensitivity"=c(step_0.1$byClass[1],step_0.15$byClass[1],step_0.2$byClass[1],step_0.5$byClass[1] ) )
-Sensitivity_lasso<- data.frame("CutOff"= c("0.1", "0.15","0.2","0.5"),"LASSO_Sensitivity"=c(lasso_0.1$byClass[1],lasso_0.15$byClass[1],lasso_0.2$byClass[1],lasso_0.5$byClass[1] ) )
+#Sensitivity_lasso<- data.frame("CutOff"= c("0.1", "0.15","0.2","0.5"),"LASSO_Sensitivity"=c(lasso_0.1$byClass[1],lasso_0.15$byClass[1],lasso_0.2$byClass[1],lasso_0.5$byClass[1] ) )
 
 Specificity_simple<- data.frame("CutOff"= c("0.1", "0.15","0.2","0.5"),"Simple_Specificity"=c(simple_0.1$byClass[2],simple_0.15$byClass[2],simple_0.2$byClass[2],simple_0.5$byClass[2] ) )
 Specificity_step<- data.frame("CutOff"= c("0.1", "0.15","0.2","0.5"),"Step_Specificity"=c(step_0.1$byClass[2],step_0.15$byClass[2],step_0.2$byClass[2],step_0.5$byClass[2] ) )
-Specificity_lasso<- data.frame("CutOff"= c("0.1", "0.15","0.2","0.5"),"LASSO_Specificity"=c(lasso_0.1$byClass[2],lasso_0.15$byClass[2],lasso_0.2$byClass[2],lasso_0.5$byClass[2] ) )
+#Specificity_lasso<- data.frame("CutOff"= c("0.1", "0.15","0.2","0.5"),"LASSO_Specificity"=c(lasso_0.1$byClass[2],lasso_0.15$byClass[2],lasso_0.2$byClass[2],lasso_0.5$byClass[2] ) )
 
 Accuracy_simple<- data.frame("CutOff"= c("0.1", "0.15","0.2","0.5"),"Simple_Accuracy"=c(simple_0.1$overall[1],simple_0.15$overall[1],simple_0.2$overall[1],simple_0.5$overall[1] ) )
 Accuracy_step<- data.frame("CutOff"= c("0.1", "0.15","0.2","0.5"),"Step_Accuracy"=c(step_0.1$overall[1],step_0.15$overall[1],step_0.2$overall[1],step_0.5$overall[1] ) )
-Accuracy_lasso<- data.frame("CutOff"= c("0.1", "0.15","0.2","0.5"),"LASSO_Accuracy"=c(lasso_0.1$overall[1],lasso_0.15$overall[1],lasso_0.2$overall[1],lasso_0.5$overall[1] ) )
+#Accuracy_lasso<- data.frame("CutOff"= c("0.1", "0.15","0.2","0.5"),"LASSO_Accuracy"=c(lasso_0.1$overall[1],lasso_0.15$overall[1],lasso_0.2$overall[1],lasso_0.5$overall[1] ) )
 
-Sensitivity <- cbind(Sensitivity_simple,Sensitivity_step$Step_Sensitivity,Sensitivity_lasso$LASSO_Sensitivity)
-Specificity <- cbind(Specificity_simple, Specificity_step$Step_Specificity,Specificity_lasso$LASSO_Specificity)
-Accuracy <- cbind(Accuracy_simple,Accuracy_step$Step_Accuracy, Accuracy_lasso$LASSO_Accuracy)
+Sensitivity <- cbind(Sensitivity_simple,Sensitivity_step$Step_Sensitivity)
+Specificity <- cbind(Specificity_simple, Specificity_step$Step_Specificity)
+Accuracy <- cbind(Accuracy_simple,Accuracy_step$Step_Accuracy)
 Sensitivity
 Specificity
 Accuracy
