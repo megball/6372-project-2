@@ -899,14 +899,13 @@ summary(step.complex)
 
 ```{r}
 
+complex.pred <- predict(step.complex, newdata = test, type="response")
+
 #ROCR
 results.complex<-prediction(complex.pred, test$y,label.ordering=c("no","yes"))
 roc.complex = performance(results.complex, measure = "tpr", x.measure = "fpr")
 plot(roc.complex,colorize = TRUE)
 abline(a=0, b= 1)
-
-
-complex.pred <- predict(step.complex, newdata = test, type="response")
 
 cutoff<-0.5
 class.complex<-factor(ifelse(complex.pred>cutoff,"yes","no"),levels=c("no","yes"))
