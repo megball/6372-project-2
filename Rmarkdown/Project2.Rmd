@@ -28,6 +28,8 @@ library(ROCR)
 library(MASS)
 library(glmnet)
 library(pROC)
+library(pacman)
+#library(broom)
 ```
 
 # Load Data
@@ -72,8 +74,16 @@ nrow(df)
 df <- df %>%  filter(job != "unknown")
 nrow(df)
 #down to 38,245 obs
+
+#remove yes from default - only 3, and all 3 are "no"
+df <- df %>%  filter(default != "yes")
+nrow(df)
+#down to 38,242 obs
+
+
 str(df)
 #recheck summary
+summary(df)
 summary(df)
 ```
 
@@ -122,10 +132,45 @@ ggplot(data = pc.scores, aes(x = PC3, y = PC4)) +
   ggtitle("PCA of Numeric Data pre-EDA")
 ```
 
+PCA without pdays. campaign, and previous as they are more like factors and not continuous
+
+```{r}
+df.numeric2 <- df.numeric %>% dplyr::select(-c(pdays, campaign, previous))
+
+pc.result2<-prcomp(df.numeric2,scale.=TRUE)
+pc.scores2<-pc.result2$x
+pc.scores2<-data.frame(pc.scores2)
+pc.scores2$y<-df$y
+pc.scores2
+
+#Scree plot
+eigenvals2<-(pc.result2$sdev)^2
+eigenvals2
+plot(1:7,eigenvals2/sum(eigenvals2),type="l",main="Scree Plot PC's",ylab="Prop. Var. Explained",ylim=c(0,1))
+cumulative.prop2<-cumsum(eigenvals2/sum(eigenvals2))
+lines(1:7,cumulative.prop2,lty=2)
+
+#Use ggplot2 to plot the first few pc's
+ggplot(data = pc.scores2, aes(x = PC1, y = PC2)) +
+  geom_point(aes(col=y), size=1)+
+  ggtitle("PCA of Numeric Data pre-EDA")
+#There is some separation, but it is not in a way we would hope for our response variable
+
+ggplot(data = pc.scores2, aes(x = PC2, y = PC3)) +
+  geom_point(aes(col=y), size=1)+
+  ggtitle("PCA of Numeric Data pre-EDA")
+
+ggplot(data = pc.scores2, aes(x = PC3, y = PC4)) +
+  geom_point(aes(col=y), size=1)+
+  ggtitle("PCA of Numeric Data pre-EDA")
+```
+
+Still does not seem of much value.
+
 ```{r}
 #ggpairs(df,columns=1:18, aes(colour=y))
 
-ggpairs(df,columns=3:7, aes(colour=y))
+ggpairs(df,columns=2:7, aes(colour=y))
 
 ggpairs(df, columns=14:18, aes(colour=y))
 
@@ -141,28 +186,30 @@ ggplot(df, aes(x=age, y=duration, color = y)) +  geom_point(size=1, shape="circl
 Duration vs Age: The duration of last contact (in seconds) was longer for ages 25-50. And it was understandably longer for 'yes'' vs for 'no'.
 
 ```{r}
-ggplot(df, aes(x=age, y=cons_price_idx, color = y)) +  geom_point(size=1, shape="circle") +   ggtitle("Consumer Price Index vs Age")
+ggplot(df, aes(x = age, y = cons_price_idx, fill = y)) +  geom_point(size =
+                                                                        1, shape = "circle") +   ggtitle("Consumer Price Index vs Age")
 
 
 #Checking collinearlity using box plots
-ggplot(df, aes(x=age, y=cons_price_idx, color = y)) +  geom_boxplot() +   ggtitle("Consumer Price Index vs Age") 
+ggplot(df, aes(x = age, y = cons_price_idx, fill = y)) +  geom_boxplot() +   ggtitle("Consumer Price Index vs Age")
 
-ggplot(df, aes(x=duration , y=age, color = y)) +  geom_boxplot() +   ggtitle("Age vs. duration")
-
-
-ggplot(df, aes(x=cons_price_idx , y=cons_conf_idx, color = y)) +  geom_boxplot() +   ggtitle("cons.price.idx vs. cons.conf.idx")
-
-ggplot(df, aes(x=cons_price_idx , y=emp_var_rate, color = y)) +  geom_boxplot() +   ggtitle("cons.price.idx vs. emp.var.rate")
+ggplot(df, aes(x = duration , y = age, fill = y)) +  geom_boxplot() +   ggtitle("Age vs. duration")
 
 
-ggplot(df) + geom_histogram(mapping = aes(x=nr_employed, fill=y)) +ggtitle("Distribution of 'y' by nr.employed")
+ggplot(df, aes(x = cons_price_idx , y = cons_conf_idx, fill = y)) +  geom_boxplot() +   ggtitle("cons.price.idx vs. cons.conf.idx")
+
+ggplot(df, aes(x = cons_price_idx , y = emp_var_rate, fill = y)) +  geom_boxplot() +   ggtitle("cons.price.idx vs. emp.var.rate")
+
+
+ggplot(df) + geom_histogram(mapping = aes(x = nr_employed, fill = y)) +
+  ggtitle("Distribution of 'y' by nr.employed")
 
 # ggplot(bank_additional_full, aes(x=age, y=education)) +
-#   geom_point(size=1, shape="circle") + 
-#   ggtitle("Education vs Age")  + 
+#   geom_point(size=1, shape="circle") +
+#   ggtitle("Education vs Age")  +
 #    facet_wrap(~ y)
 
-ggplot(df) + geom_histogram(mapping = aes(x=age, fill=y)) +ggtitle("Distribution of 'y' by age")
+ggplot(df) + geom_histogram(mapping = aes(x = age, fill = y)) + ggtitle("Distribution of 'y' by age")
 ```
 
 ## Creating new variables
@@ -248,7 +295,7 @@ Visually looking, conversion rate seems to be higher for 'single' people
 ### Analyzing duration and creating duration group variable
 ```{r}
 summary(df$duration)
-df$duration_group <-   cut(df$duration,       breaks = c(-Inf,100,60,300,600,Inf),       labels = c("0-30s", "30-60s", "1-5 min", "5-10min","10+ min"))
+df$duration_group <-   cut(df$duration,       breaks = c(-Inf,300,600,Inf),       labels = c("0-5min", "5-10min","10+ min"))
 # Check for missing values
 tibble(variable = names(colSums(is.na(df))),
        missing = colSums(is.na(df))) %>% 
@@ -321,72 +368,38 @@ df <- df %>% relocate(y, .after = last_col())
 sample10k <- sample_n(df, 10000)
 #down sample to balance response
 set.seed(1)
-downsample <- downSample(x = sample10k[, -21],
+downsample <- downSample(x = sample10k[, -24],
 y = sample10k$y)
 table(downsample$Class)
 RFcontrol <- rfeControl(functions=rfFuncs, method="cv", number=5, verbose = FALSE)
 set.seed(123)
 subsets <- c(1:5, 10, 15, 20)
-RFresults <- rfe(downsample[,1:20], downsample[[21]], sizes=subsets, rfeControl=RFcontrol)
+RFresults <- rfe(downsample[,1:23], downsample[[24]], sizes=subsets, rfeControl=RFcontrol)
 RFresults
 varImp(RFresults)
 ```
 
 ```{r}
 #save dataset to this point
-#df_clean <- write.csv(df, "data/df_clean.csv", row.names = FALSE)
+#df_clean <- write.csv(df, "df_clean.csv", row.names = FALSE)
 
 #open saved dataframe
 #df <- read.csv(here::here("data", "df_clean.csv"), stringsAsFactors = TRUE)
 #str(df)
 ```
 
-# PCA check
-```{r}
-#Re-run PCA after EDA - where we essentially just removed some unknown variables and therefore reduced overall sample size
-df.numeric2 <- df[ , sapply(df, is.numeric)]
-
-pc.result2<-prcomp(df.numeric2,scale.=TRUE)
-pc.scores2<-pc.result2$x
-pc.scores2<-data.frame(pc.scores2)
-pc.scores2$y<-df$y
-pc.scores2
-
-#Scree plot
-eigenvals2<-(pc.result2$sdev)^2
-eigenvals2
-plot(1:10,eigenvals2/sum(eigenvals2),type="l",main="Scree Plot PC's",ylab="Prop. Var. Explained",ylim=c(0,1))
-cumulative.prop2<-cumsum(eigenvals2/sum(eigenvals2))
-lines(1:10,cumulative.prop2,lty=2)
-
-#Use ggplot2 to plot the first few pc's
-ggplot(data = pc.scores2, aes(x = PC1, y = PC2)) +
-  geom_point(aes(col=y), size=1)+
-  ggtitle("PCA of Numeric Data post-EDA")
-#Looks almost exactly the same
-
-ggplot(data = pc.scores2, aes(x = PC2, y = PC3)) +
-  geom_point(aes(col=y), size=1)+
-  ggtitle("PCA of Numeric Data post-EDA")
-
-ggplot(data = pc.scores2, aes(x = PC3, y = PC4)) +
-  geom_point(aes(col=y), size=1)+
-  ggtitle("PCA of Numeric Data post-EDA")
-
-```
-
 # Train/Test Split
 
 ```{r}
 summary(df)
-#38245 obs. of 24 variables
+#38242 obs. of 24 variables
 
 set.seed(1234) 
 
 df_yes <- df %>% filter(y=='yes')
 df_No <- df %>% filter(y=='no')
 num_rows_yes <- nrow(df_yes) #4,258
-num_rows_no <- nrow(df_No) #33,987
+num_rows_no <- nrow(df_No) #33,984
 
 train_idx_yes <- sample(1:num_rows_yes, 0.8 * num_rows_yes)
 train_yes <- df_yes[train_idx_yes, ]
@@ -397,20 +410,20 @@ nrow(test_yes)  #852
 train_idx_no <- sample(1:num_rows_no, 0.8 * num_rows_no)
 train_no <- df_No[train_idx_no, ]
 test_no <- df_No[-train_idx_no, ]
-nrow(train_no) #27,189
-nrow(test_no)  #6798
+nrow(train_no) #27,187
+nrow(test_no)  #6797
 
 train <- rbind(train_yes, train_no)
 test <- rbind(test_yes, test_no)
 
-nrow(train) #30,595
-nrow(test) #7,650
+nrow(train) #30,593
+nrow(test) #7,649
 
 nrow(train %>% filter(y=='yes')) #3,406
 nrow(test %>% filter(y=='yes'))  #852
 
 summary(train)
-#30595 obs. of 24 variables
+#30593 obs. of 24 variables
 
 #write.csv(train, "data/train.csv", row.names = FALSE)
 #write.csv(test, "data/test.csv", row.names = FALSE)
@@ -428,48 +441,60 @@ exp(cbind("Odds ratio" = coef(simple.log), confint.default(simple.log, level = 0
 vif(simple.log)
 ```
 
+Remove either pdays or prevly_Cntctd - think prevly_Cntcted will be more useful, remove pdays and re-run. 
 
-Remove variables with high vifs and run the model again
 ```{r}
-#pdays / prevly_Cntctd
-#emp_var_rate/euribor3m/nr_employed
-#age/ Age_Grp
-#duration/duration_group
-train_simple <- train %>% dplyr::select(-age, -pdays,-emp_var_rate, -duration_group )
+
+train_simple <- train %>% dplyr::select(-pdays)
 
 #Check vifs again
 simple.log<-glm(y~.,family="binomial",data=train_simple)
 summary(simple.log)
-exp(cbind("Odds ratio" = coef(simple.log), confint.default(simple.log, level = 0.95)))
+#exp(cbind("Odds ratio" = coef(simple.log), confint.default(simple.log, level = 0.95)))
 vif(simple.log)
 ```
 
-VIFs are still high for euribor3m and nr_employed, but model shows euribor3m as insignificant. As euribor3m looks important practically, remove nr_employed and see if things change.
+VIFs are still high for euribor3m and nr_employed, and model shows nr_employed as significant. Remove nr_employed and emp_var_rate and see if things change
 
 ```{r}
-train_simple_2 <- train_simple %>% dplyr::select(-nr_employed )
+train_simple_2 <- train_simple %>% dplyr::select(-nr_employed, -emp_var_rate )
 
 simple.log<-glm(y~.,family="binomial",data=train_simple_2)
 summary(simple.log)
-exp(cbind("Odds ratio" = coef(simple.log), confint.default(simple.log, level = 0.95)))
+#exp(cbind("Odds ratio" = coef(simple.log), confint.default(simple.log, level = 0.95)))
 vif(simple.log)
 ```
 
-poutcome and prevly_Cntctd have higher vifs but let's keep both of them.
-
-Remove statistically insignificant variables and run the model again
+poutcome has higher VIF, but seems like it is practically significant. Remove age because it is significant and age_grp is not - should lower VIF
 
 ```{r}
-train_simple_3 <- train_simple_2 %>% dplyr::select(-marital,-day_of_week, -loan, -housing,-previous)
+train_simple_3 <- train_simple_2 %>% dplyr::select(-age)
 
 #Check model again
 simple.log<-glm(y~.,family="binomial",data=train_simple_3)
 summary(simple.log)
-exp(cbind("Odds ratio" = coef(simple.log), confint.default(simple.log, level = 0.95)))
+#exp(cbind("Odds ratio" = coef(simple.log), confint.default(simple.log, level = 0.95)))
 vif(simple.log)
 
+```
+
+Remove statistically insignificant values
+
+```{r}
+train_simple_4 <- train_simple_3 %>% dplyr::select(-marital, -housing, -loan, -day_of_week, -previous)
+
+#Check model again
+simple.log<-glm(y~.,family="binomial",data=train_simple_4)
+summary(simple.log)
+#exp(cbind("Odds ratio" = coef(simple.log), confint.default(simple.log, level = 0.95)))
+vif(simple.log)
+
+```
+
+
+```{r}
 #simple model -1 
-simple.log<-glm(y~job+education+default+contact+month+duration+campaign+poutcome+cons_price_idx+cons_conf_idx+euribor3m+Age_Grp+prevly_Cntctd,family="binomial",data=train)
+simple.log<-glm(y~job+education+default+contact+month+duration+campaign+poutcome+cons_price_idx+cons_conf_idx+euribor3m+Age_Grp+prevly_Cntctd+duration_group,family="binomial",data=train)
 #simple.log<-glm(y~.,family="binomial",data=train_simple_3)
 summary(simple.log)
 exp(cbind("Odds ratio" = coef(simple.log), confint.default(simple.log, level = 0.95)))
@@ -479,7 +504,7 @@ fit.pred.simple<-predict(simple.log,newdata=test, type="response")
 
 class.simple<-factor(ifelse(fit.pred.simple>0.5,"yes","no"),levels=c("no","yes"))
 # use caret and compute a confusion matrix
-confusionMatrix(class.simple,test$y)
+confusionMatrix(class.simple,test$y, positive = "yes")
 ```
 
 
@@ -499,7 +524,7 @@ vif(step.log)
 
 ```{r}
 #Remove variables with high vifs and run the model again
-train_step <- train %>% dplyr::select(-emp_var_rate)
+train_step <- train %>% dplyr::select(-emp_var_rate, euribor3m)
 #Check vifs again
 full.log<-glm(y~.,family="binomial",data=train_step)
 step.log<-full.log %>% stepAIC(trace=FALSE)
@@ -520,10 +545,10 @@ summary(step.log)
 vif(step.log)
 ```
 
-pdays and prevly_Cntctd are have high VIFs.Removing pdays
+poutcome has high VIF, removing poutcome
 
 ```{r}
-train_step_3 <- train_step_2 %>% dplyr::select(-pdays )
+train_step_3 <- train_step_2 %>% dplyr::select(-poutcome )
 #Check vifs again
 full.log<-glm(y~.,family="binomial",data=train_step_3)
 step.log<-full.log %>% stepAIC(trace=FALSE)
@@ -532,45 +557,22 @@ summary(step.log)
 vif(step.log)
 ```
 
-```{r}
-full.log<-glm(y~education+default+contact+month+duration+campaign+poutcome+cons_price_idx+euribor3m+Age_Grp,family="binomial",data=train)
-#full.log<-glm(y~.,family="binomial",data=train_step_3)
-step.log<-full.log %>% stepAIC(trace=FALSE)
-summary(step.log)
-#exp(cbind("Odds ratio" = coef(step.log), confint.default(step.log, level = 0.95)))
-vif(step.log)
-```
-
-poutcome and prevly_Cntctd have high VIFs but these are not interchangable.
-Remove statistically insignificant variables and run the model again
-
-```{r}
-#str(train_step_3)
-#Run step model again
-#full.log<-glm(y~education+default+contact+month+duration+campaign+poutcome+cons_price_idx+euribor3m+Age_Grp,family="binomial",data=train)
-#full.log<-glm(y~.,family="binomial",data=train_step_3)
-
-#step.log<-full.log %>% stepAIC(trace=FALSE)
-#summary(step.log)
-#exp(cbind("Odds ratio" = coef(step.log), confint.default(step.log, level = 0.95)))
-#vif(step.log) 
-```
-education is border line and contact became insignificant. Remove contact from the model
+pdays and prevly_Cntcted now have very large VIF. Let's remove pdays as it is likely to be more misleading versus our categorical version
 
 ```{r}
 #Run step model again
-#final model using stepwise for feature selection
-full.log<-glm(y~education+default+month+duration+campaign+poutcome+cons_price_idx+euribor3m+Age_Grp,family="binomial",data=train)
-#full.log<-glm(y~.,family="binomial",data=train)
+full.log<-glm(y~job+default+contact+month+duration+campaign+previous+cons_price_idx+cons_conf_idx+euribor3m+Age_Grp+prevly_Cntctd+duration_group,family="binomial",data=train)
+#full.log<-glm(y~.,family="binomial",data=train_step_3)
+
 step.log<-full.log %>% stepAIC(trace=FALSE)
 summary(step.log)
+#exp(cbind("Odds ratio" = coef(step.log), confint.default(step.log, level = 0.95)))
+vif(step.log) 
 ```
 
-education becomes statistically significant after removing contact. VIFs look good.
+Keep as final model. All are significant and VIFS look good - indicates we should be OK to keep both duration and duration group.
 
 ```{r}
-#exp(cbind("Odds ratio" = coef(step.log), confint.default(step.log, level = 0.95)))
-vif(step.log)
 #Predicting using step 
 fit.pred.step<-predict(step.log,newdata=test,type="response")
 test$y[1:15]
@@ -578,10 +580,76 @@ fit.pred.step[1:15]
 
 class.step1<-factor(ifelse(fit.pred.step>0.5,"yes","no"),levels=c("no","yes"))
 # use caret and compute a confusion matrix
-confusionMatrix(class.step1,test$y)
-  #Acc 91%, Sens. 97%, Spec. 42%
+confusionMatrix(class.step1,test$y, positive = "yes")
+  #Acc 91%, Sens. 44%, Spec. 97%
 ```
 
+### Check residuals and outliers
+```{r}
+plot(step.log, which = 4, id.n = 10) #Cooks D plot
+```
+Simerpreet - need your help to update this
+
+```{r}
+#step.log.data
+
+#step.log.data <- augment(step.log) %>% 
+#  mutate(index = 1:n()) 
+#ggplot(step.log.data, aes(index, .std.resid)) +   geom_point(aes(color = y)) + ggtitle("Residual plot")
+
+```
+
+```{r}
+#Residual diagnostics 
+plot(step.log)
+
+#examine outliers 1 
+nrow(train) #30593
+train2 <- train %>% dplyr::filter(!rownames(train) %in% c("17215","31370","33679"))
+nrow(train2) 
+#Residual diagnostics 
+step.log2<-glm(y ~ job + default + contact + month + duration + 
+    campaign + previous + cons_price_idx + cons_conf_idx + euribor3m + 
+    Age_Grp + prevly_Cntctd + duration_group,family="binomial",data=train2)
+#full.log<-glm(y~.,family="binomial",data=train)
+
+summary(step.log2)
+plot(step.log2)
+```
+
+```{r}
+#examine outliers 2 
+nrow(train2) #30590
+train3 <- train2 %>% dplyr::filter(!rownames(train2) %in% c("32754","18438","21183"))
+nrow(train3) 
+#Residual diagnostics 
+step.log3<-glm(y ~ job + default + contact + month + duration + 
+    campaign + previous + cons_price_idx + cons_conf_idx + euribor3m + 
+    Age_Grp + prevly_Cntctd + duration_group,family="binomial",data=train3)
+#full.log<-glm(y~.,family="binomial",data=train)
+
+summary(step.log3)
+plot(step.log3)
+
+```
+
+Check what the outliers are
+
+```{r}
+train %>% dplyr::filter(rownames(train) %in% c("17215","31370","33679")) %>% dplyr::select(y,job,default,contact,month,duration,campaign,previous,cons_price_idx,cons_conf_idx,euribor3m,Age_Grp,prevly_Cntctd,duration_group)
+```
+
+Check if metrics change at all with the reduced model to determine if it's worth removing outliers. No significant changes in coefficients and AIC only reduces slightly.
+
+```{r}
+fit.pred.step_outlier<-predict(step.log3,newdata=test,type="response")
+
+class.step_out<-factor(ifelse(fit.pred.step_outlier>0.5,"yes","no"),levels=c("no","yes"))
+# use caret and compute a confusion matrix
+confusionMatrix(class.step_out,test$y, positive = "yes")
+```
+
+No real change. OK to keep outliers in the model.
 
 # LASSO 
 
@@ -597,13 +665,13 @@ coef(cvfit, s = "lambda.min")
 print("CV Error Rate:")
 cvfit$cvm[which(cvfit$lambda==cvfit$lambda.min)]
 #"CV Error Rate:"
-#0.09053767
+#0.09021672
 
 #Optimal penalty
 print("Penalty Value:")
 cvfit$lambda.min
 #"Penalty Value:"
-#0.001054887
+#0.0008648178
 finalmodel<-glmnet(dat.train.x, dat.train.y, family = "binomial",lambda=cvfit$lambda.min)
 finalmodel$call
 finalmodel
@@ -619,8 +687,8 @@ fit.pred.lasso[1:15]
 #confusion matrix at 0.5 cutoff
 class.lasso1<-factor(ifelse(fit.pred.lasso>0.5,"yes","no"),levels=c("no","yes"))
 # use caret and compute a confusion matrix
-confusionMatrix(class.lasso1,test$y)
-#Acc 91%, Sens. 97%, Spec. 45%
+confusionMatrix(class.lasso1,test$y, positive = "yes")
+#Acc 91.5%, Sens. 45%, Spec. 97%
 
 #ROCR
 results.lasso<-prediction(fit.pred.lasso, test$y,label.ordering=c("no","yes"))
@@ -713,17 +781,17 @@ conf.simple
 print("Overall accuracy for LASSO and Stepwise respectively")
 sum(diag(conf.lasso))/sum(conf.lasso)
 sum(diag(conf.step))/sum(conf.step)
-#print("Alternative calculations of accuracy")
-#Acc_LASSO_0.1 <- mean(class.lasso==test$y)
-#Acc_STEP_0.1 <-mean(class.step==test$y)
-#Acc_SIMPLE_0.1<-mean(class.simple==test$y)
+print("Alternative calculations of accuracy")
+Acc_LASSO_0.1 <- mean(class.lasso==test$y)
+Acc_STEP_0.1 <-mean(class.step==test$y)
+Acc_SIMPLE_0.1<-mean(class.simple==test$y)
 ```
 
 Confusion Matrix for cut off =0.1
 ```{r}
-lasso_0.1<-confusionMatrix(conf.lasso)
-step_0.1<-confusionMatrix(conf.step)
-simple_0.1<-confusionMatrix(conf.simple)
+lasso_0.1<-confusionMatrix(conf.lasso, positive = "yes")
+step_0.1<-confusionMatrix(conf.step, positive = "yes")
+simple_0.1<-confusionMatrix(conf.simple, positive = "yes")
 ```
 
 ```{r}
@@ -759,18 +827,18 @@ conf.simple
 print("Overall accuracy for LASSO and Stepwise respectively")
 sum(diag(conf.lasso))/sum(conf.lasso)
 sum(diag(conf.step))/sum(conf.step)
-#print("Alternative calculations of accuracy")
-#Acc_LASSO_0.15 <- mean(class.lasso==test$y)
-#Acc_STEP_0.15 <-mean(class.step==test$y)
-#Acc_SIMPLE_0.15<-mean(class.simple==test$y)
+print("Alternative calculations of accuracy")
+Acc_LASSO_0.15 <- mean(class.lasso==test$y)
+Acc_STEP_0.15 <-mean(class.step==test$y)
+Acc_SIMPLE_0.15<-mean(class.simple==test$y)
 ```
 
 
 Confusion Matrix for cut off =0.15
 ```{r}
-lasso_0.15<-confusionMatrix(conf.lasso)
-step_0.15<-confusionMatrix(conf.step)
-simple_0.15<-confusionMatrix(conf.simple)
+lasso_0.15<-confusionMatrix(conf.lasso, positive = "yes")
+step_0.15<-confusionMatrix(conf.step, positive = "yes")
+simple_0.15<-confusionMatrix(conf.simple, positive = "yes")
 ```
 
 Checking 0.2 cut off
@@ -830,28 +898,44 @@ Sensitivity
 Specificity
 Accuracy
 ```
+```{r}
+#compare all at 0.15 cutoff
+
+Sensitivity<- data.frame("Model" = c("Simple", "Step", "LASSO"), "Sensitivity" =c(simple_0.15$byClass[1],step_0.15$byClass[1],lasso_0.15$byClass[1]))
+
+Specificity<- data.frame("Specificity"=c(simple_0.15$byClass[2],step_0.15$byClass[2],lasso_0.15$byClass[2] ) )
+
+Accuracy<- data.frame("Accuracy"=c(simple_0.15$overall[1],step_0.15$overall[1],lasso_0.15$overall[1]) )
+
+Overall <- cbind(Sensitivity,Specificity,Accuracy)
+Overall
+```
 
 # Complex Logistic Model 
 
 Run Initial Logistic Regression allowing for interaction
 ```{r}
 #computer memory issues - start with only one added interaction
-complex.log<-glm(y~ education + default + month + duration + campaign + poutcome + cons_price_idx + euribor3m + Age_Grp + duration*poutcome,family="binomial",data=train)
+complex.log<-glm(y~ job + default + contact + month + duration + campaign +
+	previous + cons_price_idx + cons_conf_idx + euribor3m +
+	Age_Grp + prevly_Cntctd + duration_group + duration*default,family="binomial",data=train)
 summary(complex.log)
-exp(cbind("Odds ratio" = coef(complex.log), confint.default(complex.log, level = 0.95)))
+#exp(cbind("Odds ratio" = coef(complex.log), confint.default(complex.log, level = 0.95)))
 ```
 
 Testing for some interactions based on EDA
 
 ```{r}
-complex.log<-glm(y~ education + default + month + duration + campaign + poutcome + cons_price_idx + euribor3m + Age_Grp + Age_Grp*education + campaign*duration + default*poutcome + cons_price_idx*euribor3m + month* euribor3m,family="binomial",data=train)
+complex.log<-glm(y~ job + default + contact + month + duration + campaign +
+	previous + cons_price_idx + cons_conf_idx + euribor3m +
+	Age_Grp + prevly_Cntctd + duration_group + Age_Grp*education + campaign*duration + cons_price_idx*euribor3m + month* euribor3m,family="binomial",data=train)
 summary(complex.log)
 #exp(cbind("Odds ratio" = coef(complex.log), confint.default(complex.log, level = 0.95)))
 
 #complex.pred <- predict(complex.log, newdata = test, type="response")
 ```
 
-Duration and campaign is significant but has a small coefficient/odds ratio. Month and euribor3m are significant as an interaction term with some odds ratios being very large. Education and age group is not significant for interaction. 
+Duration and campaign is significant but has a small coefficient/odds ratio. Month and euribor3m are significant as an interaction term with some odds ratios being very large. Education and age group is not significant for interaction. We also likely don't want to use education for any interaction due to no observations falling into that group.
 
 # Additional EDA for interaction
 
@@ -859,8 +943,6 @@ Let's run some more EDA with specific focus on our variables from the stepwise m
 
 ```{r}
 #numerical y vars
-ggplot(df, aes(x=education , y=emp_var_rate, fill = y)) +  geom_boxplot() +   ggtitle("Education vs. emp.var.rate")
-
 ggplot(df, aes(x=month , y=emp_var_rate, fill = y)) +  geom_boxplot() +   ggtitle("Month vs. emp.var.rate")
 
 ggplot(df, aes(x=default , y=duration, fill = y)) +  geom_boxplot() +   ggtitle("Default vs. Duration")
@@ -870,6 +952,18 @@ ggplot(df, aes(x=default , y=campaign, fill = y)) +  geom_boxplot() +   ggtitle(
 ggplot(df, aes(x=default , y=cons_price_idx, fill = y)) +  geom_boxplot() +   ggtitle("Default vs. cons.price.idx")
 
 ggplot(df, aes(x=default , y=euribor3m, fill = y)) +  geom_boxplot() +   ggtitle("Default vs. euribor3m")
+
+ggplot(df, aes(x=contact , y=duration, fill = y)) +  geom_boxplot() +   ggtitle("Contact vs. Duration")
+
+ggplot(df, aes(x=contact , y=campaign, fill = y)) +  geom_boxplot() +   ggtitle("Contact vs. Campaign")
+
+ggplot(df, aes(x=prevly_Cntctd , y=cons_price_idx, fill = y)) +  geom_boxplot() +   ggtitle("prevly_Cntctd vs. cons.price.idx")
+
+ggplot(df, aes(x=prevly_Cntctd , y=euribor3m, fill = y)) +  geom_boxplot() +   ggtitle("prevly_Cntctdt vs. euribor3m")
+
+ggplot(df, aes(x=prevly_Cntctd , y=campaign, fill = y)) +  geom_boxplot() +   ggtitle("prevly_Cntctdt vs. campaign")
+
+ggplot(df, aes(x=prevly_Cntctd , y=previous, fill = y)) +  geom_boxplot() +   ggtitle("prevly_Cntctdt vs. previous")
 ```
 
 ```{r}
@@ -878,10 +972,12 @@ prop.table(table(df_yes$default,df_yes$month),2)
 prop.table(table(df_No$y,df_No$month),2)
 ```
 
-Add in some interactions based on what we see from these charts: education/empvarrate, default/duration, default/euribor3m, default/month and keeping in month/euribor3m
+Add in some interactions based on what we see from these charts: default/duration, contact/duration, default/month and keeping in month/euribor3m
 
 ```{r}
-complex.log<-glm(y~ education + default + month + duration + campaign + poutcome + cons_price_idx + euribor3m + Age_Grp + month* euribor3m + education * emp_var_rate + default * duration + default * euribor3m + default * month,family="binomial",data=train)
+complex.log<-glm(y~ job + default + contact + month + duration + campaign +
+	previous + cons_price_idx + cons_conf_idx + euribor3m +
+	Age_Grp + prevly_Cntctd + duration_group + default*duration + contact*duration + default*month + month*euribor3m,family="binomial",data=train)
 summary(complex.log)
 
 ```
@@ -895,9 +991,10 @@ step.complex<-complex.log %>% stepAIC(trace=FALSE)
 summary(step.complex)
 ```
 
-#Check metrics with standard 0.5 accuracy and our 0.15 accuracy for simple log model
+#Check metrics with standard 0.5 accuracy and our 0.15 accuracy for complex log model
 
 ```{r}
+complex.pred <- predict(step.complex, newdata = test, type="response")
 
 #ROCR
 results.complex<-prediction(complex.pred, test$y,label.ordering=c("no","yes"))
@@ -906,8 +1003,6 @@ plot(roc.complex,colorize = TRUE)
 abline(a=0, b= 1)
 
 
-complex.pred <- predict(step.complex, newdata = test, type="response")
-
 cutoff<-0.5
 class.complex<-factor(ifelse(complex.pred>cutoff,"yes","no"),levels=c("no","yes"))
 
@@ -915,7 +1010,7 @@ class.complex<-factor(ifelse(complex.pred>cutoff,"yes","no"),levels=c("no","yes"
 conf.complex<-table(class.complex,test$y)
 conf.complex
 
-complex<-confusionMatrix(conf.complex)
+complex<-confusionMatrix(conf.complex, positive = "yes")
 complex
 
 cutoff<-0.15
@@ -925,7 +1020,7 @@ class.complex<-factor(ifelse(complex.pred>cutoff,"yes","no"),levels=c("no","yes"
 conf.complex<-table(class.complex,test$y)
 conf.complex
 
-complex<-confusionMatrix(conf.complex)
+complex<-confusionMatrix(conf.complex, positive = "yes")
 complex
 
 cutoff<-0.3
@@ -935,7 +1030,7 @@ class.complex<-factor(ifelse(complex.pred>cutoff,"yes","no"),levels=c("no","yes"
 conf.complex<-table(class.complex,test$y)
 conf.complex
 
-complex<-confusionMatrix(conf.complex)
+complex<-confusionMatrix(conf.complex, positive = "yes")
 complex
 ```
 
@@ -962,7 +1057,7 @@ auc.train <- auc.train@y.values
 plot(roc.perf, colorize = TRUE)
 abline(a=0, b= 1)
 text(x = .40, y = .6,paste("AUC = ", round(auc.train[[1]],3), sep = ""))
-#AUC = 0.921
+#AUC = 0.922
 ```
 
 ```{r}
@@ -1016,15 +1111,15 @@ for (i in 1:nloops){
 
 hist(cv.aucs)
 summary(cv.aucs)
-#Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-#0.9098  0.9186  0.9211  0.9212  0.9242  0.9342 
+#   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+# 0.9100  0.9187  0.9219  0.9217  0.9248  0.9336 
 ```
 
 LDA had good results keeping all numeric variables in the data with 50-fold CV
 
 ```{r}
 #test using just the numeric ones from our best step model
-fit.lda_step <- lda(train.lda.y ~ duration + campaign + cons_price_idx + euribor3m, data = train.lda.x)
+fit.lda_step <- lda(train.lda.y ~ duration + campaign + previous + cons_price_idx + cons_conf_idx +  euribor3m, data = train.lda.x)
 pred.lda_step <- predict(fit.lda_step, newdata = train.lda.x)
 
 preds_step <- pred.lda_step$posterior
@@ -1037,7 +1132,7 @@ auc.train_step <- auc.train_step@y.values
 plot(roc.perf_step, colorize = TRUE)
 abline(a=0, b= 1)
 text(x = .40, y = .6,paste("AUC = ", round(auc.train_step[[1]],3), sep = ""))
-#AUC = 0.907
+#AUC = 0.911
 
 #running cv on train set using LDA with subset of numeric vars
 nloops<-50   #number of CV loops
@@ -1052,7 +1147,7 @@ for (i in 1:nloops){
   cvtrain.y<-train.lda.y[index]
   cvtest.y<-train.lda.y[-index]
   
-  cvfit_2 <- lda(cvtrain.y ~ duration + campaign + cons_price_idx + euribor3m, data = cvtrain.x)
+  cvfit_2 <- lda(cvtrain.y ~ duration + campaign + previous + cons_price_idx + cons_conf_idx +  euribor3m, data = cvtrain.x)
   fit.pred_2 <- predict(cvfit_2, newdata = cvtest.x)
   preds.cv_2 <- fit.pred_2$posterior
   preds.cv_2 <- as.data.frame(preds.cv_2)
@@ -1066,8 +1161,8 @@ for (i in 1:nloops){
 
 hist(cv.aucs_2)
 summary(cv.aucs_2)
-#Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-#0.8962  0.9029  0.9068  0.9065  0.9088  0.9174 
+#   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+# 0.9003  0.9074  0.9114  0.9107  0.9137  0.9233 
 ```
 
 The subset using the numeric vars from our step logistic model has very similar performance
@@ -1087,8 +1182,29 @@ auc.train_step2 <- auc.train_step2@y.values
 plot(roc.perf_step2, colorize = TRUE)
 abline(a=0, b= 1)
 text(x = .40, y = .6,paste("AUC = ", round(auc.train_step2[[1]],3), sep = ""))
-#AUC = 0.905
+#AUC = 0.903
 ```
+
+Run once more, but just the numeric from above, removing those that act more like factors.
+
+```{r}
+#test using just the numeric ones from our best step model
+fit.lda_step2 <- lda(train.lda.y ~ duration  + cons_price_idx + cons_conf_idx +  euribor3m, data = train.lda.x)
+pred.lda_step2 <- predict(fit.lda_step2, newdata = train.lda.x)
+
+preds_step2 <- pred.lda_step2$posterior
+preds_step2 <- as.data.frame(preds_step2)
+
+pred_step2 <- prediction(preds_step2[,2],train.lda.y)
+roc.perf_step2 = performance(pred_step2, measure = "tpr", x.measure = "fpr")
+auc.train_step2 <- performance(pred_step2, measure = "auc")
+auc.train_step2 <- auc.train_step2@y.values
+plot(roc.perf_step2, colorize = TRUE)
+abline(a=0, b= 1)
+text(x = .40, y = .6,paste("AUC = ", round(auc.train_step2[[1]],3), sep = ""))
+#AUC = 0.912
+```
+No significant change.
 
 ### Running QDA
 
@@ -1106,7 +1222,7 @@ for (i in 1:nloops){
   cvtrain.y<-train.lda.y[index]
   cvtest.y<-train.lda.y[-index]
   
-  cvfit_qda <- qda(cvtrain.y ~ duration + campaign + cons_price_idx + euribor3m, data = cvtrain.x)
+  cvfit_qda <- qda(cvtrain.y ~ duration + campaign + previous + cons_price_idx + cons_conf_idx +  euribor3m, data = cvtrain.x)
   fit.pred_qda <- predict(cvfit_qda, newdata = cvtest.x)
   preds.cv_qda <- fit.pred_qda$posterior
   preds.cv_qda <- as.data.frame(preds.cv_qda)
@@ -1120,13 +1236,13 @@ for (i in 1:nloops){
 
 hist(cv.aucs_qda)
 summary(cv.aucs_qda)
-#Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-#0.8860  0.8919  0.8959  0.8963  0.9005  0.9091 
+#   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+# 0.8845  0.8911  0.8958  0.8955  0.8993  0.9097 
 ```
 
 ### QDA on train set
 ```{r}
-fit.qda <- qda(train.lda.y ~ duration + campaign + cons_price_idx + euribor3m, data = train.lda.x)
+fit.qda <- qda(train.lda.y ~ duration + campaign + previous + cons_price_idx + cons_conf_idx +  euribor3m, data = train.lda.x)
 pred.qda <- predict(fit.qda, newdata = train.lda.x)
 
 preds_qda <- pred.qda$posterior
@@ -1154,7 +1270,7 @@ auc.train_qda1 <- auc.train_qda1@y.values
 plot(roc.perf_qda1)
 abline(a=0, b= 1)
 text(x = .40, y = .6,paste("AUC = ", round(auc.train_qda1[[1]],3), sep = ""))
-#AUC = 0.895
+#AUC = 0.892
 ```
 
 ```{r}
@@ -1172,7 +1288,7 @@ for (i in 1:nloops){
   cvtrain.yshuf<-dat.train.yshuf[index]
   cvtest.yshuf<-dat.train.yshuf[-index]
   
-  cvfit_shuf <- lda(cvtrain.yshuf ~ duration + campaign + cons_price_idx + euribor3m, data = cvtrain.x)
+  cvfit_shuf <- lda(cvtrain.yshuf ~ duration + campaign + previous + cons_price_idx + cons_conf_idx +  euribor3m, data = cvtrain.x)
   fit.pred_shuf <- predict(cvfit_shuf, newdata = cvtest.x)
   preds.cv_shuf <- fit.pred_shuf$posterior
   preds.cv_shuf <- as.data.frame(preds.cv_shuf)
@@ -1186,8 +1302,8 @@ for (i in 1:nloops){
 
 hist(cv.aucs_shuf)
 summary(cv.aucs_shuf)
-#Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-#0.4940  0.5034  0.5102  0.5098  0.5172  0.5347 
+ #  Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+ #0.4871  0.5081  0.5127  0.5125  0.5186  0.5299 
 ```
  
 The AUC degrades to ~0.5 so we seem to be doing something right.
@@ -1248,10 +1364,6 @@ Overall
 
 # Random Forest 
 
-```{r}
-library(pacman)
-```
-
 ## Load the data
 
 ```{r}
@@ -1296,10 +1408,10 @@ Note: I set min.node.size to 1 as appropriate for classification
 
 ```{r}
 plot(fitRF)
-confusionMatrix(fitRF)
+confusionMatrix(fitRF, positive = "yes")
 ```
 
-Optimizing for ROC, the winning parameters are an mtry of 5 predictors considered at each split, and the Hellinger split rule.  It's interesting that Hellinger won. I found some papers suggesting Hellinger handles imbalanced data well; being insensitive to skew.*
+Optimizing for ROC, the winning parameters are an mtry of 7 predictors considered at each split, and the Hellinger split rule.  It's interesting that Hellinger won. I found some papers suggesting Hellinger handles imbalanced data well; being insensitive to skew.*
 * CITATION: https://www3.nd.edu/~nchawla/papers/DMKD11.pdf
 * CITATION: https://medium.com/@evgeni.dubov/classifying-imbalanced-data-using-hellinger-distance-f6a4330d6f9a
 
@@ -1311,10 +1423,10 @@ Optimizing for ROC, the winning parameters are an mtry of 5 predictors considere
 fitRF.predictions.raw <- predict(fitRF, newdata = test, type="raw")
 fitRF.predictions.prob <- predict(fitRF, newdata = test, type="prob")
 
-confusionMatrix(fitRF.predictions.raw, test$y)
+confusionMatrix(fitRF.predictions.raw, test$y, positive = "yes")
 ```
 
-Using the default cutoff, our random forest gets a test accuracy of 0.9161, with Sensitivity 0.4953 and Specificity 0.9688.
+Using the default cutoff, our random forest gets a test accuracy of 0.9158, with Sensitivity 0.52113 and Specificity 0.96528.
 
 # ROC Curve and Optimal Cutoff
 
@@ -1344,7 +1456,8 @@ plot(roc.perf_rf)
 abline(a=0, b= 1)
 text(x = .40, y = .6,paste("AUC = ", round(auc.rf[[1]],3), sep = ""))
 ```
-The most balanced cutoff for this model is 0.117, which gives 
+
+The most balanced cutoff for this model is 0.108
 
 ## ROC Curve and Optimal Cutoff
 
