@@ -108,7 +108,7 @@ pc.result<-prcomp(df.numeric,scale.=TRUE)
 pc.scores<-pc.result$x
 pc.scores<-data.frame(pc.scores)
 pc.scores$y<-df$y
-pc.scores
+#pc.scores
 
 #Scree plot
 eigenvals<-(pc.result$sdev)^2
@@ -141,7 +141,7 @@ pc.result2<-prcomp(df.numeric2,scale.=TRUE)
 pc.scores2<-pc.result2$x
 pc.scores2<-data.frame(pc.scores2)
 pc.scores2$y<-df$y
-pc.scores2
+#pc.scores2
 
 #Scree plot
 eigenvals2<-(pc.result2$sdev)^2
