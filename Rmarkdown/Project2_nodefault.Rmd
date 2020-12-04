@@ -72,6 +72,8 @@ nrow(df)
 df <- df %>%  filter(job != "unknown")
 nrow(df)
 #down to 38,245 obs
+
+
 str(df)
 #recheck summary
 summary(df)

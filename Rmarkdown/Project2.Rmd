@@ -3,6 +3,8 @@ title: "Project2"
 author: "Rinku Lichti, Simerpreet Reddy, Megan Ball"
 date: "11/4/2020"
 output: html_document
+editor_options: 
+  chunk_output_type: inline
 ---
 
 ```{r setup, include=FALSE}
@@ -1498,4 +1500,9 @@ legend("bottomright",legend=c("Stepwise Logistic Regression","Complex Model", "L
 abline(a=0, b= 1)
 ```
 
+## R Code {-}
+
+```{r ref.label=knitr::all_labels(), echo=TRUE, eval=FALSE}
+
+```
 
