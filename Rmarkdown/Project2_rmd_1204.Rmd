@@ -766,10 +766,10 @@ Accuracy<- data.frame("Accuracy"=c(simple_0.15$overall[1],step_0.15$overall[1],l
 Overall <- cbind(Sensitivity,Specificity,Accuracy)
 Overall
 ```
-# Based on Confusion matrix metrices, we chose the following model to be our final simple and interpretable mode:
+Based on Confusion matrix metrices, we chose the following model to be our final simple and interpretable mode:
 full.log<-glm(y~job+default+contact+month+duration+campaign+previous+cons_price_idx+cons_conf_idx+euribor3m+Age_Grp+prevly_Cntctd+duration_group,family="binomial",data=train)
 
-Our model is stored as step.log. We will run residual diagnostics and outliers analysis on this model.
+Our final model is stored as step.log. We will run residual diagnostics and outliers analysis on this model.
 
 ### Check residuals and outliers
 ```{r}
