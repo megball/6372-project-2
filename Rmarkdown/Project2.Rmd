@@ -1370,6 +1370,16 @@ Overall
 ```{r}
 #train <- read.csv("../data/train.csv", stringsAsFactors = TRUE)
 #test <- read.csv("../data/test.csv", stringsAsFactors = TRUE)
+
+# set up train2/test2 to explore modeling without duration
+#train2 <- train %>% dplyr::select(c(-duration, -duration_group))
+#test2 <- test %>% dplyr::select(c(-duration, -duration_group))
+
+#train_orig <- train
+#test_orig <- test
+
+#train <- train2
+#test <- test2
 ```
 
 ## Train a Random Forest, tuning mtry and splitrule
@@ -1392,6 +1402,7 @@ fitRF <- train(y ~ .,
                data = train, 
                method = "ranger", 
                metric = "ROC",
+               importance = "impurity",
                trControl = cv_control,
                num.threads = 6,
                num.trees = 30,
@@ -1412,7 +1423,33 @@ plot(fitRF)
 confusionMatrix(fitRF, positive = "yes")
 ```
 
-Optimizing for ROC, the winning parameters are an mtry of 7 predictors considered at each split, and the Hellinger split rule.  It's interesting that Hellinger won. I found some papers suggesting Hellinger handles imbalanced data well; being insensitive to skew.*
+### Min Depth Distribution
+
+```{r}
+library(randomForestExplainer)
+forest_frame <- min_depth_distribution(fitRF$finalModel)
+plot_min_depth_distribution(forest_frame)
+```
+
+### Mean minimal depth for most frequent interactions
+
+```{r echo=F, warning=F, message=F}
+# !!!DANGER!!!   !!!SUPER SLOW!!!   !!!LUNCH BREAK/WASH YOUR CAR SLOW!!
+#plot_min_depth_interactions(fitRF$finalModel, k=7)
+```
+# Other measures of importance
+
+```{r echo=F, message=F}
+multi_imps = measure_importance(fitRF$finalModel)
+plot_importance_ggpairs(multi_imps)
+```
+
+
+###
+
+
+
+Optimizing for ROC, the winning parameters are an mtry of 5 predictors considered at each split, and the Hellinger split rule.  It's interesting that Hellinger won. I found some papers suggesting Hellinger handles imbalanced data well; being insensitive to skew.*
 * CITATION: https://www3.nd.edu/~nchawla/papers/DMKD11.pdf
 * CITATION: https://medium.com/@evgeni.dubov/classifying-imbalanced-data-using-hellinger-distance-f6a4330d6f9a
 
@@ -1482,6 +1519,13 @@ predicted.classes.balanced <- factor(
   ifelse( fitRF.predictions.prob$yes > cutoff, "yes", "no"), levels=c("no","yes"))
 confusionMatrix(predicted.classes.balanced, test$y, positive="yes")
 ```
+
+```{r}
+# If exploring modeling without duration, restore the original train/test for use by any code below that might rely on it
+#train <- train_orig
+#test <- test_orig
+```
+
 
 
 
