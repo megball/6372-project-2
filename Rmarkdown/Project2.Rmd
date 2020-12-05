@@ -1487,7 +1487,7 @@ confusionMatrix(predicted.classes.balanced, test$y, positive="yes")
 
 # Model Comparison 
 ```{r}
-graphics.off()
+#graphics.off()
 
 #add ROC curve for our top simple model, complex model, LDA, and RF
 
