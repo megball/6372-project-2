@@ -3,7 +3,7 @@ title: "Project2"
 author: "Rinku Lichti, Simerpreet Reddy, Megan Ball"
 date: "12/5/2020"
 output:
-word_document: default
+  word_document: default
 editor_options:
   chunk_output_type: inline
 ---
