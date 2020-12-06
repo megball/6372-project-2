@@ -1,9 +1,9 @@
 ---
 title: "Project2"
 author: "Rinku Lichti, Simerpreet Reddy, Megan Ball"
-date: "12/5/2020"
+date: "11/4/2020"
 output:
-word_document: default
+  html_document: default
 editor_options:
   chunk_output_type: inline
 ---
@@ -216,7 +216,6 @@ ggplot(df) + geom_histogram(mapping = aes(x = nr_employed, fill = y)) +
 ggplot(df)+ 
   geom_histogram(mapping = aes(x = age, fill = y)) + 
   ggtitle("Distribution of 'y' by age")
-
 ```
 
 ## Creating new variables
@@ -233,9 +232,6 @@ ggplot(df) +
   ggtitle("Distribution of 'y' by Age_Grp") +  
   ylab("Cnt") + 
   xlab("Age Group")
-
-ggplot(df) + geom_bar(mapping = aes(x = month, fill = y)) +
-  ggtitle("Distribution of 'y' by duration")
 ```
 
 We will keep both age and age group in our model to see if one is selected over the other. We need to make sure to not use both in our model building.
@@ -351,49 +347,10 @@ df3 <- df %>%
   filter(y == "yes")
 
 df3
-
-ggplot(df) + geom_histogram(mapping = aes(x = duration, fill = y)) +
-  ggtitle("Distribution of 'y' by duration")
-
 #ggplot(df3, aes(x=duration_group, y=duration_group_conv)) +  geom_point() +  facet_wrap(~ y)
 ```
 
 Looking above, clearly conversion rate goes up the longer the most recent call
-
-Additional visualizations:
-
-```{r}
-ggplot(df, aes(x = month , y = euribor3m, fill = y)) +  
-  geom_boxplot() +   
-  ggtitle("euribor3m by month")
-
-ggplot(df, aes(x=contact, y=duration, color = y)) +  
-  geom_point(size=1, shape="circle") +   
-  ggtitle("contact vs duration")
-
-ggplot(df, aes(x=contact, y=duration, fill = y)) +  
-  geom_boxplot() +   
-  ggtitle("contact vs duration") +
-  facet_grid(~y)
-
-
-ggplot(df, aes(x=default, y=duration, color = y)) +  
-  geom_point(size=1, shape="circle") +   
-  ggtitle("contact vs duration")
-
-ggplot(df, aes(x=default, y=duration, fill = y)) +  
-  geom_boxplot() +   
-  ggtitle("default vs duration") +
-  facet_grid(~y)
-
-ggplot(df) + 
-  geom_bar(mapping = aes(x=month, fill = y)) + 
-  ggtitle("Number of 'y' by month") +
-  ylab("Cnt") + xlab("month")
-
-plot(default~month,data=df,col=c("purple","green"))
-
-```
 
 ### Visualizing categorical variables
 ```{r}
@@ -521,8 +478,8 @@ nrow(train %>% filter(y=='yes')) #3,406
 nrow(test %>% filter(y=='yes'))  #852
 summary(train)
 #30593 obs. of 24 variables
-#write.csv(train, "../data/train.csv", row.names = FALSE)
-#write.csv(test, "../data/test.csv", row.names = FALSE)
+#write.csv(train, "data/train.csv", row.names = FALSE)
+#write.csv(test, "data/test.csv", row.names = FALSE)
 ```
 
 
@@ -729,20 +686,20 @@ confusionMatrix(class.lasso1,test$y, positive = "yes")
 #ROCR
 results.lasso <-
   prediction(fit.pred.lasso, test$y, label.ordering = c("no", "yes"))
-roc.lasso = performance(results.lasso, measure = "tpr", x.measure = "fpr",print.cutoffs.at=seq(0,1,by=0.1), text.adj=c(1.2,1.2), avg="threshold", lwd=3)
+roc.lasso = performance(results.lasso, measure = "tpr", x.measure = "fpr")
 plot(roc.lasso, colorize = TRUE)
 abline(a = 0, b = 1)
 
 #step model prediction
 results.step <-
   prediction(fit.pred.step, test$y, label.ordering = c("no", "yes"))
-roc.step = performance(results.step, measure = "tpr", x.measure = "fpr", print.cutoffs.at = c("0.1", "0.15", "0.2"))
+roc.step = performance(results.step, measure = "tpr", x.measure = "fpr")
 
 simple.log <- glm(y ~ ., family = "binomial", data = train)
 fit.pred.origin <- predict(simple.log, newdata = test, type = "response")
 results.origin <-
   prediction(fit.pred.origin, test$y, label.ordering = c("no", "yes"))
-roc.origin = performance(results.origin, measure = "tpr", x.measure = "fpr", print.cutoffs.at = c(0.1, 0.15, 0.2))
+roc.origin = performance(results.origin, measure = "tpr", x.measure = "fpr")
 
 #plot ROC curves
 plot(roc.lasso)
@@ -756,31 +713,6 @@ legend(
   lwd = 1
 )
 abline(a = 0, b = 1)
-```
-
-Tried to find optimal cut-off using other packages, could not get to work
-
-```{r}
-#finding optimal cut-off for step model
-perf.acc<-performance(results.step,"acc") #find list of accuracies
-perf.fpr<-performance(results.step,"fpr") # find list of fp rates
-perf.fnr<-performance(results.step,"fnr") # find list of fn rates
-
-acc.rocr<-max(perf.acc@y.values[[1]])   # accuracy using rocr
-
-#find cutoff list for accuracies
-cutoff.list.acc <- unlist(perf.acc@y.values[[1]])
-
-#find optimal cutoff point for accuracy
-optimal.cutoff.acc<-cutoff.list.acc[which.max(perf.acc@y.values[[1]])]
-
-#find optimal cutoff fpr, as numeric because a list is returned
-optimal.cutoff.fpr<-which(perf.fpr@x.values[[1]]==as.numeric(optimal.cutoff.acc))
-
-# find cutoff list for fpr
-cutoff.list.fpr <- unlist(perf.fpr@y.values[[1]])
-# find fpr using rocr
-fpr.rocr<-cutoff.list.fpr[as.numeric(optimal.cutoff.fpr)]
 ```
 
 ```{r}
@@ -1356,16 +1288,6 @@ conf.complex<-table(class.complex,test$y)
 conf.complex
 complex<-confusionMatrix(conf.complex, positive = "yes")
 complex
-
-
-cutoff<-0.108
-class.complex_.108<-factor(ifelse(complex.pred>cutoff,"yes","no"),levels=c("no","yes"))
-
-#Confusion Matrix
-conf.complex_.108<-table(class.complex_.108,test$y)
-conf.complex_.108
-complex_.108<-confusionMatrix(conf.complex_.108, positive = "yes")
-complex_.108
 ```
 
 Our metrics look much better with the 0.15 cut-off, similar to our simpler model above. Not much performance enhancement by making the model more complex.
@@ -1780,7 +1702,7 @@ plot_min_depth_distribution(forest_frame)
 
 ```{r echo=F, warning=F, message=F}
 # !!!DANGER!!!   !!!SUPER SLOW!!!   !!!LUNCH BREAK/WASH YOUR CAR SLOW!!
-plot_min_depth_interactions(fitRF$finalModel, k=7)
+#plot_min_depth_interactions(fitRF$finalModel, k=7)
 ```
 
 # Other measures of importance
@@ -1788,13 +1710,14 @@ plot_min_depth_interactions(fitRF$finalModel, k=7)
 ```{r echo=F, message=F}
 multi_imps = measure_importance(fitRF$finalModel)
 plot_importance_ggpairs(multi_imps)
-
-varImp(fitRF)
 ```
 
 Optimizing for ROC, the winning parameters are an mtry of 5 predictors considered at each split, and the Hellinger split rule.  It's interesting that Hellinger won. I found some papers suggesting Hellinger handles imbalanced data well; being insensitive to skew.*
 * CITATION: https://www3.nd.edu/~nchawla/papers/DMKD11.pdf
 * CITATION: https://medium.com/@evgeni.dubov/classifying-imbalanced-data-using-hellinger-distance-f6a4330d6f9a
+
+
+## Performance on Test Set
 
 
 ```{r}
@@ -1804,44 +1727,6 @@ confusionMatrix(fitRF.predictions.raw, test$y, positive = "yes")
 ```
 
 Using the default cutoff, our random forest gets a test accuracy of 0.9158, with Sensitivity 0.52113 and Specificity 0.96528.
-
-Testing without duration
-
-```{r warning=FALSE, message = FALSE}
-# set up train2/test2 to explore modeling without duration
-train2 <- train %>% dplyr::select(c(-duration, -duration_group))
-test2 <- test %>% dplyr::select(c(-duration, -duration_group))
-
-#train <- train2
-#test <- test2
-
-set.seed(1234)
-cv_control <- trainControl(method="cv", 
-                     classProbs = TRUE,
-                     savePredictions = TRUE,
-                     summaryFunction = twoClassSummary,
-                     num = 5)
-rf_grid <- expand.grid(
-  mtry = 4:8,
-  splitrule = c("gini","extratrees", "hellinger"),
-  min.node.size = c(1)
-)
-fitRF_2 <- train(y ~ ., 
-               data = train2, 
-               method = "ranger", 
-               metric = "ROC",
-               importance = "impurity",
-               trControl = cv_control,
-               num.threads = 6,
-               num.trees = 30,
-               tuneGrid=rf_grid)  
-fitRF_2
-
-forest_frame_2 <- min_depth_distribution(fitRF_2$finalModel)
-plot_min_depth_distribution(forest_frame_2)
-
-plot_min_depth_interactions(fitRF_2$finalModel, k=7)
-```
 
 # ROC Curve and Optimal Cutoff
 
@@ -1914,7 +1799,7 @@ confusionMatrix(predicted.classes.balanced, test$y, positive="yes")
 #add ROC curve for our top simple model, complex model, LDA, and RF
 plot(roc.step,col="orange")
 plot(roc.complex,col = "blue", add = TRUE)
-plot(roc.perf, col="red", add = TRUE)
+plot(roc.perf_step2, col="red", add = TRUE)
 plot(roc.perf_rf, col = "green", add = TRUE)
 legend("bottomright",legend=c("Stepwise Logistic Regression","Complex Model", "LDA", "Random Forest"),col=c("orange","blue","red","green"),lty=1,lwd=1)
 abline(a=0, b= 1)
